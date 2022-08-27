@@ -279,15 +279,6 @@ int main()
     fs1 << "E" << E;
     fs1 << "F" << F;
 
-    cout << "CM1" << CM1;
-    cout << "CM2" << CM2;
-    cout << "D1" << D1;
-    cout << "D2" << D2;
-    cout << "R" << R;
-    cout << "T" << T;
-    cout << "E" << E;
-    cout << "F" << F;
-
     cout << "Done Calibration\n";
 
     cout << "Starting Rectification\n";
@@ -301,7 +292,6 @@ int main()
     fs1 << "Q" << Q;
 
     cout << "Done Rectification\n";
-
 
     return 0;
 }
