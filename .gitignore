@@ -1,1 +1,2 @@
-camera_data_2022-08-27-19-40-44_L.yml camera_data_2022-08-27-19-41-10_R.yml camera_data_2022-08-27-19-51-43_L.yml camera_data_2022-08-27-19-52-13_R.yml camera_data_2022-08-27-19-56-24_stereo.yml camera_data_2022-08-27-19-58-42_L.yml camera_data_2022-08-27-19-59-11_R.yml camera_data_2022-08-27-20-00-32_stereo.yml camera_data_2022-08-27-20-08-19_L.yml camera_data_2022-08-27-20-08-51_R.yml camera_data_2022-08-27-20-10-23_stereo.yml
+*.yml
+build/
