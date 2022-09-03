@@ -27,7 +27,7 @@ using std::filesystem::directory_iterator;
 //     speckleRange = 1
 // )
 // initialize values for StereoSGBM parameters
-int window_size = 3;
+int window_size = 5;
 
 int minDisparity = 6;
 int numDisparities = 40;
@@ -445,6 +445,7 @@ int main()
     createTrackbar("speckleRange",      "disparity", &speckleRange        , 1000, speckleRange_CB);
     createTrackbar("fullDP",            "disparity", &StereoMode          ,    4, fullDP_CB);
 
+	bool wait = true;
     for(auto file : files)
     {
         Mat img = imread(file);
@@ -462,22 +463,30 @@ int main()
         updateImage();
 
         reprojectImageTo3D(disp, Out3D, Q);
-		ofstream test("./test.txt");
-		test << Out3D << endl;
 
-        write_ply(file + "reconstruct.ply", disp, Out3D, imgU_L);
+		string filename_stem = std::filesystem::path(file).stem() ;
 
-        imshow(file + "_L", imgU_L);
-        imshow(file + "_R", imgU_R);
+        write_ply(path + "/ply/" + filename_stem + ".ply", disp, Out3D, imgU_L);
 
-        char k = waitKey();
-        destroyWindow(file + "_L");
-        destroyWindow(file + "_R");
+		if(wait)
+		{
+			imshow(file + "_L", imgU_L);
+			imshow(file + "_R", imgU_R);
 
-        if(k == 27)
-        {
-            break;
-        }
+			char k = waitKey();
+			if(k == 27)
+			{
+				break;
+			}
+			if(k == 'w')
+			{
+				wait = false;
+				destroyAllWindows();
+				continue;
+			}
+			destroyWindow(file + "_L");
+			destroyWindow(file + "_R");
+		}
     }
     return 0;
 }
