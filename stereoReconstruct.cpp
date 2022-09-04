@@ -8,6 +8,7 @@
 #include <opencv2/videoio.hpp>
 #include <opencv2/highgui.hpp>
 #include <opencv2/imgproc.hpp>
+#include "opencv-helper.hpp"
 
 using namespace std;
 using namespace cv;
@@ -30,8 +31,8 @@ using std::filesystem::directory_iterator;
 int window_size = 5;
 
 int minDisparity = 6;
-int numDisparities = 40;
-int block_size = 12; // 3 to 11 is recommended
+int numDisparities = 80;
+int block_size = 4; // 3 to 11 is recommended
 int P1=8 * 3 * window_size * window_size;
 int P2=32 * 3 * window_size * window_size;
 int disp12MaxDiff=1;
@@ -81,6 +82,14 @@ static void numDisparities_CB( int val, void* )
 {
   numDisparities = val + 1;
   stereo->setNumDisparities(numDisparities);
+
+  updateImage();
+}
+
+static void block_size_CB( int val, void* )
+{
+  block_size = val;
+  stereo->setBlockSize(block_size);
 
   updateImage();
 }
@@ -144,246 +153,6 @@ static void fullDP_CB( int val, void* )
   updateImage();
 }
 
-void write_ply(string fileName, Mat& disparcityMap, Mat& points, Mat& colors)
-{
-
-    const char format[] =
-#ifdef _WIN32
-"ply\n\
-format ascii 1.0\n\
-element vertex %i\n\
-property float x\n\
-property float y\n\
-property float z\n\
-property uchar red\n\
-property uchar green\n\
-property uchar blue\n\
-end_header\n";
-#else
-    "ply\r\n\
-    format ascii 1.0\r\n\
-    element vertex %i\r\n\
-    property float x\r\n\
-    property float y\r\n\
-    property float z\r\n\
-    property uchar red\r\n\
-    property uchar green\r\n\
-    property uchar blue\r\n\
-    end_header\r\n";
-#endif
-
-    FILE* out_ply = fopen(fileName.data(), "w");
-
-    double disparcityMapMin;
-    minMaxLoc(disparcityMap, &disparcityMapMin);
-    cout << "min map: " <<disparcityMapMin << endl;
-    uint32_t VertexCnt = 0;
-
-    switch(disparcityMap.type())
-    {
-    	case 0:
-    	{
-			for (int y = 0; y < disparcityMap.rows; y++)
-				for (int x = 0; x < disparcityMap.cols; x++)
-					if(disparcityMap.at<uint8_t>(y, x) > disparcityMapMin)
-						VertexCnt++;
-    	}break;
-    	case 1:
-    	{
-			for (int y = 0; y < disparcityMap.rows; y++)
-				for (int x = 0; x < disparcityMap.cols; x++)
-					if(disparcityMap.at<int8_t>(y, x) > disparcityMapMin)
-						VertexCnt++;
-    	}break;
-    	case 2:
-    	{
-			for (int y = 0; y < disparcityMap.rows; y++)
-				for (int x = 0; x < disparcityMap.cols; x++)
-					if(disparcityMap.at<uint16_t>(y, x) > disparcityMapMin)
-						VertexCnt++;
-    	}break;
-    	case 3:
-    	{
-			for (int y = 0; y < disparcityMap.rows; y++)
-				for (int x = 0; x < disparcityMap.cols; x++)
-					if(disparcityMap.at<int16_t>(y, x) > disparcityMapMin)
-						VertexCnt++;
-    	}break;
-    	case 4:
-    	{
-			for (int y = 0; y < disparcityMap.rows; y++)
-				for (int x = 0; x < disparcityMap.cols; x++)
-					if(disparcityMap.at<int32_t>(y, x) > disparcityMapMin)
-						VertexCnt++;
-    	}break;
-    	case 5:
-    	{
-			for (int y = 0; y < disparcityMap.rows; y++)
-				for (int x = 0; x < disparcityMap.cols; x++)
-					if(disparcityMap.at<float>(y, x) > disparcityMapMin)
-						VertexCnt++;
-    	}break;
-    	case 6:
-    	{
-			for (int y = 0; y < disparcityMap.rows; y++)
-				for (int x = 0; x < disparcityMap.cols; x++)
-					if(disparcityMap.at<double>(y, x) > disparcityMapMin)
-						VertexCnt++;
-    	}break;
-    	default:
-    	{
-    		cerr << "Incorrect disparcity map" << endl;
-    		return;
-    	};
-    }
-
-    fprintf(out_ply, format, VertexCnt);
-
-    switch(disparcityMap.type())
-    {
-    	case 0:
-    	{
-			for (int y = 0; y < disparcityMap.rows; y++)
-			{
-				for (int x = 0; x < disparcityMap.cols; x++)
-				{
-					if(disparcityMap.at<uint8_t>(y, x) > disparcityMapMin)
-					{
-						Vec3f vec = points.at <Vec3f> (y, x);
-						Vec3b col = colors.at <Vec3b> (y, x);
-#ifdef _WIN32
-						fprintf(out_ply, "%f %f %f %hhu %hhu %hhu \n", vec[0], vec[1], vec[2], col[2], col[1] ,col[0] );
-#else
-						fprintf(out_ply, "%f %f %f %hhu %hhu %hhu \r\n", vec[0], vec[1], vec[2], col[2], col[1] ,col[0] );
-#endif
-					}
-				}
-			}
-    	}break;
-    	case 1:
-    	{
-			for (int y = 0; y < disparcityMap.rows; y++)
-			{
-				for (int x = 0; x < disparcityMap.cols; x++)
-				{
-					if(disparcityMap.at<int8_t>(y, x) > disparcityMapMin)
-					{
-						Vec3f vec = points.at <Vec3f> (y, x);
-						Vec3b col = colors.at <Vec3b> (y, x);
-#ifdef _WIN32
-						fprintf(out_ply, "%f %f %f %hhu %hhu %hhu \n", vec[0], vec[1], vec[2], col[2], col[1] ,col[0] );
-#else
-						fprintf(out_ply, "%f %f %f %hhu %hhu %hhu \r\n", vec[0], vec[1], vec[2], col[2], col[1] ,col[0] );
-#endif
-					}
-				}
-			}
-    	}break;
-    	case 2:
-    	{
-			for (int y = 0; y < disparcityMap.rows; y++)
-			{
-				for (int x = 0; x < disparcityMap.cols; x++)
-				{
-					if(disparcityMap.at<uint16_t>(y, x) > disparcityMapMin)
-					{
-						Vec3f vec = points.at <Vec3f> (y, x);
-						Vec3b col = colors.at <Vec3b> (y, x);
-#ifdef _WIN32
-						fprintf(out_ply, "%f %f %f %hhu %hhu %hhu \n", vec[0], vec[1], vec[2], col[2], col[1] ,col[0] );
-#else
-						fprintf(out_ply, "%f %f %f %hhu %hhu %hhu \r\n", vec[0], vec[1], vec[2], col[2], col[1] ,col[0] );
-#endif
-					}
-				}
-			}
-    	}break;
-    	case 3:
-    	{
-			for (int y = 0; y < disparcityMap.rows; y++)
-			{
-				for (int x = 0; x < disparcityMap.cols; x++)
-				{
-					if(disparcityMap.at<int16_t>(y, x) > disparcityMapMin)
-					{
-						Vec3f vec = points.at <Vec3f> (y, x);
-						Vec3b col = colors.at <Vec3b> (y, x);
-#ifdef _WIN32
-						fprintf(out_ply, "%f %f %f %hhu %hhu %hhu \n", vec[0], vec[1], vec[2], col[2], col[1] ,col[0] );
-#else
-						fprintf(out_ply, "%f %f %f %hhu %hhu %hhu \r\n", vec[0], vec[1], vec[2], col[2], col[1] ,col[0] );
-#endif
-					}
-				}
-			}
-    	}break;
-    	case 4:
-    	{
-			for (int y = 0; y < disparcityMap.rows; y++)
-			{
-				for (int x = 0; x < disparcityMap.cols; x++)
-				{
-					if(disparcityMap.at<int32_t>(y, x) > disparcityMapMin)
-					{
-						Vec3f vec = points.at <Vec3f> (y, x);
-						Vec3b col = colors.at <Vec3b> (y, x);
-#ifdef _WIN32
-						fprintf(out_ply, "%f %f %f %hhu %hhu %hhu \n", vec[0], vec[1], vec[2], col[2], col[1] ,col[0] );
-#else
-						fprintf(out_ply, "%f %f %f %hhu %hhu %hhu \r\n", vec[0], vec[1], vec[2], col[2], col[1] ,col[0] );
-#endif
-					}
-				}
-			}
-    	}break;
-    	case 5:
-    	{
-			for (int y = 0; y < disparcityMap.rows; y++)
-			{
-				for (int x = 0; x < disparcityMap.cols; x++)
-				{
-					if(disparcityMap.at<float>(y, x) > disparcityMapMin)
-					{
-						Vec3f vec = points.at <Vec3f> (y, x);
-						uint8_t col = colors.at <uint8_t> (y, x);
-#ifdef _WIN32
-						fprintf(out_ply, "%f %f %f %hhu %hhu %hhu \n", vec[0], vec[1], vec[2], col[2], col[1] ,col[0] );
-#else
-						fprintf(out_ply, "%f %f %f %hhu %hhu %hhu \r\n", vec[0], vec[1], vec[2], col, col ,col );
-#endif
-					}
-				}
-			}
-    	}break;
-    	case 6:
-    	{
-			for (int y = 0; y < disparcityMap.rows; y++)
-			{
-				for (int x = 0; x < disparcityMap.cols; x++)
-				{
-					if(disparcityMap.at<double>(y, x) > disparcityMapMin)
-					{
-						Vec3f vec = points.at <Vec3f> (y, x);
-						Vec3b col = colors.at <Vec3b> (y, x);
-#ifdef _WIN32
-						fprintf(out_ply, "%f %f %f %hhu %hhu %hhu \n", vec[0], vec[1], vec[2], col[2], col[1] ,col[0] );
-#else
-						fprintf(out_ply, "%f %f %f %hhu %hhu %hhu \r\n", vec[0], vec[1], vec[2], col[2], col[1] ,col[0] );
-#endif
-					}
-				}
-			}
-    	}break;
-    	default:
-    	{
-    		cerr << "Incorrect disparcity map" << endl;
-    		return;
-    	};
-    }
-
-    fclose(out_ply);
-}
-
 int main()
 {
     string path = "../2022-08-27-13-18-52-calibration";
@@ -431,19 +200,19 @@ int main()
     cout << "Undistort complete\n";
 
     // Creating a named window to be linked to the trackbars
-    namedWindow("disparity",cv::WINDOW_NORMAL);
-    resizeWindow("disparity",1280, 800);
+    namedWindow("trackbar",cv::WINDOW_NORMAL);
 
     // Creating trackbars to dynamically update the StereoBM parameters
-    createTrackbar("minDisparity",      "disparity", &minDisparity        , 15  , minDisparity_CB);
-    createTrackbar("numDisparities",    "disparity", &numDisparities      , 1000, numDisparities_CB);
-    createTrackbar("window_size",     "disparity",   &window_size       , 1000, windows_size_CB);
-    createTrackbar("disp12MaxDiff",     "disparity", &disp12MaxDiff       , 1000, disp12MaxDiff_CB);
-    createTrackbar("preFilterCap",      "disparity", &preFilterCap        , 1000, preFilterCap_CB);
-    createTrackbar("uniquenessRatio",   "disparity", &uniquenessRatio     , 1000, uniquenessRatio_CB);
-    createTrackbar("speckleWindowSize", "disparity", &speckleWindowSize   , 1000, speckleWindowSize_CB);
-    createTrackbar("speckleRange",      "disparity", &speckleRange        , 1000, speckleRange_CB);
-    createTrackbar("fullDP",            "disparity", &StereoMode          ,    4, fullDP_CB);
+    createTrackbar("minDisparity",      "trackbar", &minDisparity        , 15  , minDisparity_CB);
+    createTrackbar("numDisparities",    "trackbar", &numDisparities      , 1000, numDisparities_CB);
+    createTrackbar("window_size",       "trackbar",   &window_size       , 1000, windows_size_CB);
+	createTrackbar("block_size",        "trackbar",   &block_size       , 100, block_size_CB);
+    createTrackbar("disp12MaxDiff",     "trackbar", &disp12MaxDiff       , 1000, disp12MaxDiff_CB);
+    createTrackbar("preFilterCap",      "trackbar", &preFilterCap        , 1000, preFilterCap_CB);
+    createTrackbar("uniquenessRatio",   "trackbar", &uniquenessRatio     , 1000, uniquenessRatio_CB);
+    createTrackbar("speckleWindowSize", "trackbar", &speckleWindowSize   , 1000, speckleWindowSize_CB);
+    createTrackbar("speckleRange",      "trackbar", &speckleRange        , 1000, speckleRange_CB);
+    createTrackbar("fullDP",            "trackbar", &StereoMode          ,    4, fullDP_CB);
 
 	bool wait = true;
     for(auto file : files)
