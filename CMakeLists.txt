@@ -6,6 +6,8 @@ set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
 find_package( OpenCV REQUIRED )
+find_package(OpenGL REQUIRED)
+find_package(GLUT REQUIRED)
 #include_directories( ${OpenCV_INCLUDE_DIRS} )
 
 add_executable(calibrate3D stereo_calibrate.cpp)
@@ -13,3 +15,4 @@ add_executable(reconstruct stereoReconstruct.cpp)
 
 target_link_libraries( calibrate3D ${OpenCV_LIBS} )
 target_link_libraries( reconstruct ${OpenCV_LIBS} )
+target_link_libraries(reconstruct ${OPENGL_LIBRARIES} ${GLUT_LIBRARY} )
