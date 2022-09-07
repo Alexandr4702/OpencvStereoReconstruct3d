@@ -17,6 +17,7 @@
 
 #include <SFML/Window.hpp>
 #include <SFML/OpenGL.hpp>
+#include <SFML/Graphics.hpp>
 // #include <SFML/Keyboard.hpp>
 
 #include <eigen3/Eigen/Core>
@@ -37,7 +38,7 @@ int P1=8 * 3 * window_size * window_size;
 int P2=32 * 3 * window_size * window_size;
 int disp12MaxDiff=1;
 int preFilterCap=1;
-int uniquenessRatio=10;
+int uniquenessRatio=53;
 int speckleWindowSize=1;
 int speckleRange=1;
 int StereoMode = StereoSGBM::MODE_SGBM;
@@ -47,17 +48,26 @@ bool openglExit = false;
 class DataFromReconstruct
 {
 public:
+DataFromReconstruct(Vec3f& pos, uint8_t color):color0(color / 255.0f), color1(color / 255.0f), color2(color / 255.0f)
+{
+    x = pos[0];
+    y = pos[1];
+    z = pos[2];
+}
 float x;
 float y;
 float z;
-uint8_t color;
+float color0;
+float color1;
+float color2;
 };
 
-std::vector <DataFromReconstruct> data[2] = {
+std::vector <DataFromReconstruct> point_buffer[2] = {
     {},
     {}
 };
-uint8_t current_bufer = 0;
+uint8_t opengl_current_bufer = 0;
+bool opengl_request_change_buffer = false;
 
 class Camera
 {
@@ -86,7 +96,7 @@ class Camera
     void TranslateCam(Vector3f transl)
     {
         scoped_lock guard(mtx);
-        translation += transl;
+        translation += rotation.inverse() * transl;
     }
     void rotateCam(Quaternionf rot)
     {
@@ -99,8 +109,8 @@ class Camera
         scale += scal;
     }
     private:
-    Vector3f translation{0, 0, 0};
-    Quaternionf rotation = Quaternionf::Identity();
+    Vector3f translation{0, 0, 1};
+    Quaternionf rotation = Quaternionf(0, 0, 1, 0);
     Vector3f       scale {1.0f, 1.0f, 1.0f};
     std::mutex mtx;
 };
@@ -126,6 +136,47 @@ Mat imgU_L, imgU_R;
 Mat Out3D;
 
 // Defining callback functions for the trackbars to update parameter values
+void drawCube();
+void drawPoint();
+
+void drawImage3D(Vector3f& translation, AngleAxisf& rotation, Vector3f& scale)
+{
+    glLoadIdentity();
+    // glScalef(scale.x(), scale.y(), scale.z());
+    glRotatef(rotation.angle() * 180 / M_PI, rotation.axis().x(), rotation.axis().y(), rotation.axis().z());
+    glTranslatef(translation.x(), translation.y(), translation.z());
+
+    glVertexPointer(3, GL_FLOAT, sizeof(point_buffer[opengl_current_bufer][0]), &point_buffer[opengl_current_bufer][0].x);
+    glEnableClientState(GL_VERTEX_ARRAY);
+
+    glColorPointer(3, GL_FLOAT, sizeof(point_buffer[opengl_current_bufer][0]), &point_buffer[opengl_current_bufer][0].color0);
+    glEnableClientState(GL_COLOR_ARRAY);
+
+    glDrawArrays(GL_POINTS, 0, point_buffer[opengl_current_bufer].size());
+
+    return;
+
+    // glLoadIdentity();
+    // // glScalef(scale.x(), scale.y(), scale.z());
+    // glRotatef(rotation.angle() * 180 / M_PI, rotation.axis().x(), rotation.axis().y(), rotation.axis().z());
+    // glTranslatef(translation.x(), translation.y(), translation.z());
+
+    // float camMatrix[16];
+    // glGetFloatv(GL_MODELVIEW_MATRIX, camMatrix);
+    // // for(auto point :point_buffer[opengl_current_bufer])
+    // for(uint32_t i = 0; (i < 100000 || true) && (i < point_buffer[opengl_current_bufer].size()); i++)
+    // {
+    //     glLoadIdentity();
+    //     glLoadMatrixf(camMatrix);
+
+    //     glTranslatef(point_buffer[opengl_current_bufer][i].x, point_buffer[opengl_current_bufer][i].y, point_buffer[opengl_current_bufer][i].z);
+    //     // glRotatef(Clock.getElapsedTime().asSeconds() * 50, 0, 1, 0);
+    //     glScalef(0.005, 0.005, 0.005);
+    //     float color = point_buffer[opengl_current_bufer][i].color0 / 255.0f;
+    //     glColor3f(color, color, color);
+    //     drawPoint();
+    // }
+}
 
 void updateImage()
 {
@@ -221,37 +272,50 @@ static void fullDP_CB( int val, void* )
 
 void drawCube()
 {
-    glBegin(GL_QUADS);//draw some squares
-    glVertex3f(-1.f, -1.f, -1.f);
-    glVertex3f(-1.f,  1.f, -1.f);
-    glVertex3f( 1.f,  1.f, -1.f);
-    glVertex3f( 1.f, -1.f, -1.f);
+    double vertex[] =
+    {
+        -1.f,  1.f, -1.f,   1.0 ,  0.0 , 0.0 ,
+        1.f,  1.f, -1.f,    1.0 ,  0.0 , 0.0 ,
+        -1.f, -1.f, -1.f,   1.0 ,  0.0 , 0.0 ,
+        1.f, -1.f, -1.f,    1.0 ,  0.0 , 0.0 ,
+        -1.f, -1.f,  1.f,   1.0 ,  0.0 , 0.0 ,
+        -1.f,  1.f,  1.f,   1.0 ,  0.0 , 0.0 ,
+        1.f,  1.f,  1.f,    1.0 ,  0.0 , 0.0 ,
+        1.f, -1.f,  1.f,    1.0 ,  0.0 , 0.0 ,
+        -1.f, -1.f, -1.f,   1.0 ,  0.0 , 0.0 ,
+        -1.f,  1.f, -1.f,   1.0 ,  0.0 , 0.0 ,
+        -1.f,  1.f,  1.f,   1.0 ,  0.0 , 0.0 ,
+        -1.f, -1.f,  1.f,   1.0 ,  0.0 , 0.0 ,
+        1.f, -1.f, -1.f,    1.0 ,  0.0 , 0.0 ,
+        1.f,  1.f, -1.f,    1.0 ,  0.0 , 0.0 ,
+        1.f,  1.f,  1.f,    1.0 ,  0.0 , 0.0 ,
+        1.f, -1.f,  1.f,    1.0 ,  0.0 , 0.0 ,
+        -1.f, -1.f,  1.f,   1.0 ,  0.0 , 0.0 ,
+        -1.f, -1.f, -1.f,   1.0 ,  0.0 , 0.0 ,
+        1.f, -1.f, -1.f,    1.0 ,  0.0 , 0.0 ,
+        1.f, -1.f,  1.f,    1.0 ,  0.0 , 0.0 ,
+        -1.f,  1.f,  1.f,   1.0 ,  0.0 , 0.0 ,
+        -1.f,  1.f, -1.f,   1.0 ,  0.0 , 0.0 ,
+        1.f,  1.f, -1.f,    1.0 ,  0.0 , 0.0 ,
+        1.f,  1.f,  1.f    ,1.0 ,  0.0 , 0.0 ,
 
-    glVertex3f(-1.f, -1.f, 1.f);
-    glVertex3f(-1.f,  1.f, 1.f);
-    glVertex3f( 1.f,  1.f, 1.f);
-    glVertex3f( 1.f, -1.f, 1.f);
+      };
 
-    glVertex3f(-1.f, -1.f, -1.f);
-    glVertex3f(-1.f,  1.f, -1.f);
-    glVertex3f(-1.f,  1.f,  1.f);
-    glVertex3f(-1.f, -1.f,  1.f);
+    glVertexPointer(3, GL_DOUBLE, sizeof(vertex[0]) * 6, vertex);
+    glEnableClientState(GL_VERTEX_ARRAY);
 
-    glVertex3f(1.f, -1.f, -1.f);
-    glVertex3f(1.f,  1.f, -1.f);
-    glVertex3f(1.f,  1.f,  1.f);
-    glVertex3f(1.f, -1.f,  1.f);
+    glColorPointer(3, GL_DOUBLE, sizeof(vertex[0]) * 6, &vertex[3]);
+    glEnableClientState(GL_COLOR_ARRAY);
 
-    glVertex3f(-1.f, -1.f,  1.f);
-    glVertex3f(-1.f, -1.f, -1.f);
-    glVertex3f( 1.f, -1.f, -1.f);
-    glVertex3f( 1.f, -1.f,  1.f);
+    glDrawArrays(GL_QUADS, 0, 24);
+}
 
-    glVertex3f(-1.f, 1.f,  1.f);
-    glVertex3f(-1.f, 1.f, -1.f);
-    glVertex3f( 1.f, 1.f, -1.f);
-    glVertex3f( 1.f, 1.f,  1.f);
+void drawPoint()
+{
+    glBegin(GL_POINTS);
+    glVertex3f(0, 0, 0);
     glEnd();
+    return;
 }
 
 void display(sf::Clock& Clock)
@@ -275,23 +339,39 @@ void display(sf::Clock& Clock)
     glRotatef(rotation.angle() * 180 / M_PI, rotation.axis().x(), rotation.axis().y(), rotation.axis().z());
     glTranslatef(translation.x(), translation.y(), translation.z());
 
-    glTranslatef(0.f, 0.f, -10.f);
+    float camMatrix[16];
+    glGetFloatv(GL_MODELVIEW_MATRIX, camMatrix);
+
+    glTranslatef(0.f, 0.f, -15.f);
     glRotatef( - Clock.getElapsedTime().asSeconds() * 50, 0, 1, 0);
+    glScalef(0.1, 0.1, 0.1);
 
     glColor3b(0, 0, 127);
     drawCube();
 
     glLoadIdentity();
-
-    glScalef(scale.x(), scale.y(), scale.z());
-    glRotatef(rotation.angle() * 180 / M_PI, rotation.axis().x(), rotation.axis().y(), rotation.axis().z());
-    glTranslatef(translation.x(), translation.y(), translation.z());
+    glLoadMatrixf(camMatrix);
 
     glTranslatef(0.f, 5.f, -10.f);
     glRotatef(Clock.getElapsedTime().asSeconds() * 50, 0, 1, 0);
+    glScalef(0.1, 0.1, 0.1);
 
     glColor3b(0, 0, 127);
     drawCube();
+
+    glLoadIdentity();
+    glLoadMatrixf(camMatrix);
+
+    glTranslatef(5.f, 0, -10.f);
+    glRotatef(Clock.getElapsedTime().asSeconds() * 50, 0, 1, 0);
+    glScalef(0.1, 0.1, 0.1);
+
+    glColor3b(0, 0, 127);
+    drawCube();
+    drawImage3D(translation, rotation, scale);
+    // glVertexPointer(2, GL_DOUBLE, 0, line);
+    // glEnableClientState(GL_VERTEX_ARRAY);
+    // glDrawArrays(GL_LINE_STRIP,0,N);
 }
 
 void keyPressedHandler()
@@ -326,8 +406,30 @@ void opengl_init(int argc, char** argv)
     //// Setup a perspective projection & Camera position
     glMatrixMode(GL_PROJECTION);
     glLoadIdentity();
-    gluPerspective(60.f, 1.f, 03.f, 100.0f);//fov, aspect, zNear, zFar
+    gluPerspective(60.f, 1.f, 01.f, 100.0f);//fov, aspect, zNear, zFar
     // glOrtho(-1, 1, -1, 1, -100, 100);
+    sf::Shader shader;
+
+    if (!shader.loadFromFile("../vertex_shader.vert", sf::Shader::Vertex))
+    {
+        cout << "Can't load vertex shader\r\n";
+        return;
+    }
+
+    if (!shader.loadFromFile("../fragment_shader.frag", sf::Shader::Fragment))
+    {
+        cout << "Can't load fragment shader\r\n";
+        return;
+    }
+
+/*
+    Model_View.setToIdentity();
+    Model_View.translate(position);
+    Model_View.rotate(orenation);
+    Model_View.scale(scale);
+
+    QMatrix4x4 test=Projection*(cam)*Model_View;
+*/
 
 
     // run the main loop
@@ -373,13 +475,13 @@ void opengl_init(int argc, char** argv)
 
         if(sf::Keyboard::isKeyPressed(sf::Keyboard::Key::A))
         {
-            float angle = 0.5 * M_PI / 180.0f;
+            float angle = -1 * M_PI / 180.0f;
             cam.rotateCam(Quaternionf(cos(angle / 2), 0,sin(angle / 2),  0));
         }
 
         if(sf::Keyboard::isKeyPressed(sf::Keyboard::Key::D))
         {
-            float angle = -0.5 * M_PI / 180.0f;
+            float angle = 1 * M_PI / 180.0f;
             cam.rotateCam(Quaternionf(cos(angle / 2), 0, sin(angle / 2), 0));
         }
 
@@ -397,7 +499,6 @@ void opengl_init(int argc, char** argv)
         // clear the buffers
         display(Clock);
         // draw...
-
         // end the current frame (internally swaps the front and back buffers)
         window.display();
 
@@ -406,8 +507,105 @@ void opengl_init(int argc, char** argv)
     }
 }
 
+void fillBuffer(cv::Mat& disparcityMap, cv::Mat& points, cv::Mat& colors)
+{
+    double disparcityMapMin;
+    minMaxLoc(disparcityMap, &disparcityMapMin);
+    cout << "min map: " <<disparcityMapMin << endl;
+// opengl_current_bufer
+// point_buffer
+    switch(disparcityMap.type())
+    {
+    	case 0:
+    	{
+			for (int y = 0; y < disparcityMap.rows; y++)
+				for (int x = 0; x < disparcityMap.cols; x++)
+					if(disparcityMap.at<uint8_t>(y, x) > disparcityMapMin)
+                    {
+                        Vec3f vec = points.at <Vec3f> (y, x);
+						Vec3b col = colors.at <Vec3b> (y, x);
+                        point_buffer[opengl_current_bufer == 0 ? 1: 0].push_back({vec, col[0]});
+                    }
+    	}break;
+    	case 1:
+    	{
+			for (int y = 0; y < disparcityMap.rows; y++)
+				for (int x = 0; x < disparcityMap.cols; x++)
+					if(disparcityMap.at<int8_t>(y, x) > disparcityMapMin)
+                    {
+                        Vec3f vec = points.at <Vec3f> (y, x);
+						Vec3b col = colors.at <Vec3b> (y, x);
+                        point_buffer[opengl_current_bufer == 0 ? 1: 0].push_back({vec, col[0]});
+                    }
+    	}break;
+    	case 2:
+    	{
+			for (int y = 0; y < disparcityMap.rows; y++)
+				for (int x = 0; x < disparcityMap.cols; x++)
+					if(disparcityMap.at<uint16_t>(y, x) > disparcityMapMin)
+                    {
+                        Vec3f vec = points.at <Vec3f> (y, x);
+						Vec3b col = colors.at <Vec3b> (y, x);
+                        point_buffer[opengl_current_bufer == 0 ? 1: 0].push_back({vec, col[0]});
+                    }
+    	}break;
+    	case 3:
+    	{
+			for (int y = 0; y < disparcityMap.rows; y++)
+				for (int x = 0; x < disparcityMap.cols; x++)
+					if(disparcityMap.at<int16_t>(y, x) > disparcityMapMin)
+                    {
+                        Vec3f vec = points.at <Vec3f> (y, x);
+						Vec3b col = colors.at <Vec3b> (y, x);
+                        point_buffer[opengl_current_bufer == 0 ? 1: 0].push_back({vec, col[0]});
+                    }
+    	}break;
+    	case 4:
+    	{
+			for (int y = 0; y < disparcityMap.rows; y++)
+				for (int x = 0; x < disparcityMap.cols; x++)
+					if(disparcityMap.at<int32_t>(y, x) > disparcityMapMin)
+                    {
+                        Vec3f vec = points.at <Vec3f> (y, x);
+						Vec3b col = colors.at <Vec3b> (y, x);
+                        point_buffer[opengl_current_bufer == 0 ? 1: 0].push_back({vec, col[0]});
+                    }
+    	}break;
+    	case 5:
+    	{
+			for (int y = 0; y < disparcityMap.rows; y++)
+				for (int x = 0; x < disparcityMap.cols; x++)
+					if(disparcityMap.at<float>(y, x) > disparcityMapMin)
+                    {
+                        Vec3f vec = points.at <Vec3f> (y, x);
+						uint8_t col = colors.at <uint8_t> (y, x);
+                        point_buffer[opengl_current_bufer == 0 ? 1: 0].push_back({vec, col});
+                    }
+    	}break;
+    	case 6:
+    	{
+			for (int y = 0; y < disparcityMap.rows; y++)
+				for (int x = 0; x < disparcityMap.cols; x++)
+					if(disparcityMap.at<double>(y, x) > disparcityMapMin)
+                    {
+                        Vec3f vec = points.at <Vec3f> (y, x);
+						Vec3b col = colors.at <Vec3b> (y, x);
+                        point_buffer[opengl_current_bufer == 0 ? 1: 0].push_back({vec, col[0]});
+                    }
+    	}break;
+    	default:
+    	{
+    		cerr << "Incorrect disparcity map" << endl;
+    		return;
+    	};
+    }
+    opengl_current_bufer = opengl_current_bufer == 0 ? 1: 0;
+}
+
 int main(int argc, char** argv)
 {
+    cout << sizeof(DataFromReconstruct) << endl;
+
     string path = "../2022-08-27-13-18-52-calibration";
     vector <string> files;
 
@@ -467,7 +665,6 @@ int main(int argc, char** argv)
     createTrackbar("fullDP",            "trackbar", &StereoMode          ,    4, fullDP_CB);
 
     thread opengl(opengl_init, argc, argv);
-    opengl.detach();
 
     bool wait = true;
     for(auto file : files)
@@ -488,8 +685,9 @@ int main(int argc, char** argv)
 
         reprojectImageTo3D(disp, Out3D, Q);
 
-        string filename_stem = std::filesystem::path(file).stem() ;
+        fillBuffer(disp, Out3D, imgU_L);
 
+        string filename_stem = std::filesystem::path(file).stem() ;
         write_ply(path + "/ply/" + filename_stem + ".ply", disp, Out3D, imgU_L);
 
         if(wait)
@@ -514,5 +712,6 @@ int main(int argc, char** argv)
             destroyWindow(file + "_R");
         }
     }
+    opengl.join();
     return 0;
 }
