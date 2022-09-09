@@ -119,6 +119,7 @@ int speckleRange=1;
 int StereoMode = StereoSGBM::MODE_SGBM;
 
 bool openglExit = false;
+bool mainThreadExit = false;
 
 // Creating an object of StereoSGBM algorithm
 cv::Ptr<cv::StereoSGBM> stereo = cv::StereoSGBM::create(
@@ -365,9 +366,7 @@ void opengl_init(int argc, char** argv)
     float x0 = 0,y0 = 0;
     Quaternionf q0 = cam.getRotation();
 
-    // run the main loop
-    bool running = true;
-    while (running)
+    while (!openglExit)
     {
         // handle events
         sf::Event event;
@@ -377,7 +376,7 @@ void opengl_init(int argc, char** argv)
             {
             case sf::Event::Closed:
             {
-                running = false;
+                openglExit = true;
             } break;
             case sf::Event::Resized:
             {
@@ -387,7 +386,8 @@ void opengl_init(int argc, char** argv)
             {
                 if(event.key.code == sf::Keyboard::Key::Escape)
                 {
-                    running = false;
+                    mainThreadExit = true;
+                    openglExit = true;
                 }
             } break;
             case sf::Event::KeyReleased:
@@ -428,11 +428,22 @@ void opengl_init(int argc, char** argv)
             cam.TranslateCam(Vector3f(-0.05, 0, 0));
         }
 
+        if(sf::Keyboard::isKeyPressed(sf::Keyboard::Key::LShift))
+        {
+            cam.TranslateCam(Vector3f( 0, 0.05, 0));
+        }
+
+        if(sf::Keyboard::isKeyPressed(sf::Keyboard::Key::Space))
+        {
+            cam.TranslateCam(Vector3f(0, -0.05, 0));
+        }
+
         if(sf::Keyboard::isKeyPressed(sf::Keyboard::Key::Q))
         {
             float angle = 0.5 * M_PI / 180.0f;
             cam.rotateCam(Quaternionf(cos(angle / 2), 0, 0, sin(angle / 2)));
         }
+
         if(sf::Keyboard::isKeyPressed(sf::Keyboard::Key::E))
         {
             float angle = -0.5 * M_PI / 180.0f;
@@ -458,9 +469,6 @@ void opengl_init(int argc, char** argv)
         // draw...
         // end the current frame (internally swaps the front and back buffers)
         window.display();
-
-        if(openglExit)
-            break;
     }
 }
 
@@ -562,27 +570,6 @@ void fillBuffer(cv::Mat& disparcityMap, cv::Mat& points, cv::Mat& colors)
 
 int main(int argc, char** argv)
 {
-
-    // Vector3<long double> eci_pos(51844.03160856166, 3976284.4625645634, 5643515.918517955);
-    // Vector3<long double> dir(-0.007509465053810284, -0.5759538424999008, -0.8174477226368699);
-
-    // cout << fixed << setw(50);
-    // cout.precision(10);
-    // cout << "\r\n";
-
-    // cout << coordiante_from_dir_and_point(eci_pos, dir) << "\r\n";
-
-    // float teeest = 1.e8 + 1.0f;
-    // cout << teeest << endl;
-    // return 0;
-
-    // // for(float i = 1.6e7 ; i < 1.7e7; i++)
-    // // {
-    // //     cout << i  << "\r\n";
-    // // }
-    // cout << 16777217.0000000000f  << "\r\n";
-    // return 0;
-
     string path = "../2022-08-27-13-18-52-calibration";
     vector <string> files;
 
@@ -669,7 +656,14 @@ int main(int argc, char** argv)
             imshow(file + "_L", imgU_L);
             imshow(file + "_R", imgU_R);
 
-            char k = waitKey();
+            char k = waitKey(10);
+            while(k == -1)
+            {
+                k = waitKey(10);
+                if(mainThreadExit)
+                    break;
+            }
+
             if(k == 27)
             {
                 openglExit = true;
@@ -685,6 +679,8 @@ int main(int argc, char** argv)
             destroyWindow(file + "_L");
             destroyWindow(file + "_R");
         }
+        if(mainThreadExit)
+            break;
     }
     opengl.join();
     return 0;
