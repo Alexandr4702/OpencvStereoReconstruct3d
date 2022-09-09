@@ -3,6 +3,7 @@
 #include <string>
 #include <fstream>
 #include <thread>
+#include <math.h>
 
 #include <opencv2/core.hpp>
 #include <opencv2/calib3d.hpp>
@@ -29,21 +30,9 @@ using namespace Eigen;
 
 using std::filesystem::directory_iterator;
 
-int window_size = 5;
-
-int minDisparity = 6;
-int numDisparities = 80;
-int block_size = 4; // 3 to 11 is recommended
-int P1=8 * 3 * window_size * window_size;
-int P2=32 * 3 * window_size * window_size;
-int disp12MaxDiff=1;
-int preFilterCap=1;
-int uniquenessRatio=53;
-int speckleWindowSize=1;
-int speckleRange=1;
-int StereoMode = StereoSGBM::MODE_SGBM;
-
-bool openglExit = false;
+void drawCube();
+void drawPoint();
+void fillBuffer(cv::Mat& disparcityMap, cv::Mat& points, cv::Mat& colors);
 
 class DataFromReconstruct
 {
@@ -61,13 +50,6 @@ float color0;
 float color1;
 float color2;
 };
-
-std::vector <DataFromReconstruct> point_buffer[2] = {
-    {},
-    {}
-};
-uint8_t opengl_current_bufer = 0;
-bool opengl_request_change_buffer = false;
 
 class Camera
 {
@@ -103,6 +85,11 @@ class Camera
         scoped_lock guard(mtx);
         rotation = rot * rotation;
     }
+    void setCamRotation(Quaternionf rot)
+    {
+        scoped_lock guard(mtx);
+        rotation = rot;
+    }
     void ScaleCam(Vector3f scal)
     {
         scoped_lock guard(mtx);
@@ -116,6 +103,22 @@ class Camera
 };
 
 Camera cam;
+
+int window_size = 5;
+
+int minDisparity = 6;
+int numDisparities = 80;
+int block_size = 4; // 3 to 11 is recommended
+int P1=8 * 3 * window_size * window_size;
+int P2=32 * 3 * window_size * window_size;
+int disp12MaxDiff=1;
+int preFilterCap=1;
+int uniquenessRatio=53;
+int speckleWindowSize=1;
+int speckleRange=1;
+int StereoMode = StereoSGBM::MODE_SGBM;
+
+bool openglExit = false;
 
 // Creating an object of StereoSGBM algorithm
 cv::Ptr<cv::StereoSGBM> stereo = cv::StereoSGBM::create(
@@ -131,13 +134,18 @@ cv::Ptr<cv::StereoSGBM> stereo = cv::StereoSGBM::create(
 	speckleRange,
 	StereoMode
 	);
+
 Mat disp, disparity;
 Mat imgU_L, imgU_R;
 Mat Out3D;
+Mat  Q;
 
-// Defining callback functions for the trackbars to update parameter values
-void drawCube();
-void drawPoint();
+std::vector <DataFromReconstruct> point_buffer[2] = {
+    {},
+    {}
+};
+uint8_t opengl_current_bufer = 0;
+bool opengl_request_change_buffer = false;
 
 void drawImage3D(Vector3f& translation, AngleAxisf& rotation, Vector3f& scale)
 {
@@ -152,30 +160,9 @@ void drawImage3D(Vector3f& translation, AngleAxisf& rotation, Vector3f& scale)
     glColorPointer(3, GL_FLOAT, sizeof(point_buffer[opengl_current_bufer][0]), &point_buffer[opengl_current_bufer][0].color0);
     glEnableClientState(GL_COLOR_ARRAY);
 
+    glPointSize(5);
+
     glDrawArrays(GL_POINTS, 0, point_buffer[opengl_current_bufer].size());
-
-    return;
-
-    // glLoadIdentity();
-    // // glScalef(scale.x(), scale.y(), scale.z());
-    // glRotatef(rotation.angle() * 180 / M_PI, rotation.axis().x(), rotation.axis().y(), rotation.axis().z());
-    // glTranslatef(translation.x(), translation.y(), translation.z());
-
-    // float camMatrix[16];
-    // glGetFloatv(GL_MODELVIEW_MATRIX, camMatrix);
-    // // for(auto point :point_buffer[opengl_current_bufer])
-    // for(uint32_t i = 0; (i < 100000 || true) && (i < point_buffer[opengl_current_bufer].size()); i++)
-    // {
-    //     glLoadIdentity();
-    //     glLoadMatrixf(camMatrix);
-
-    //     glTranslatef(point_buffer[opengl_current_bufer][i].x, point_buffer[opengl_current_bufer][i].y, point_buffer[opengl_current_bufer][i].z);
-    //     // glRotatef(Clock.getElapsedTime().asSeconds() * 50, 0, 1, 0);
-    //     glScalef(0.005, 0.005, 0.005);
-    //     float color = point_buffer[opengl_current_bufer][i].color0 / 255.0f;
-    //     glColor3f(color, color, color);
-    //     drawPoint();
-    // }
 }
 
 void updateImage()
@@ -184,6 +171,8 @@ void updateImage()
     disp.convertTo(disp, CV_32F, 1.0);
     disp /= 16.0f;
     disparity = (disp - (float)minDisparity)/((float)numDisparities);
+    reprojectImageTo3D(disp, Out3D, Q);
+    fillBuffer(disp, Out3D, imgU_L);
     imshow("disparity", disparity);
 }
 
@@ -310,14 +299,6 @@ void drawCube()
     glDrawArrays(GL_QUADS, 0, 24);
 }
 
-void drawPoint()
-{
-    glBegin(GL_POINTS);
-    glVertex3f(0, 0, 0);
-    glEnd();
-    return;
-}
-
 void display(sf::Clock& Clock)
 {
     Vector3f translation = cam.getTranslation();
@@ -332,56 +313,7 @@ void display(sf::Clock& Clock)
 
     // Apply some transformations for the cube
     glMatrixMode(GL_MODELVIEW);
-
-    glLoadIdentity();
-
-    glScalef(scale.x(), scale.y(), scale.z());
-    glRotatef(rotation.angle() * 180 / M_PI, rotation.axis().x(), rotation.axis().y(), rotation.axis().z());
-    glTranslatef(translation.x(), translation.y(), translation.z());
-
-    float camMatrix[16];
-    glGetFloatv(GL_MODELVIEW_MATRIX, camMatrix);
-
-    glTranslatef(0.f, 0.f, -15.f);
-    glRotatef( - Clock.getElapsedTime().asSeconds() * 50, 0, 1, 0);
-    glScalef(0.1, 0.1, 0.1);
-
-    glColor3b(0, 0, 127);
-    drawCube();
-
-    glLoadIdentity();
-    glLoadMatrixf(camMatrix);
-
-    glTranslatef(0.f, 5.f, -10.f);
-    glRotatef(Clock.getElapsedTime().asSeconds() * 50, 0, 1, 0);
-    glScalef(0.1, 0.1, 0.1);
-
-    glColor3b(0, 0, 127);
-    drawCube();
-
-    glLoadIdentity();
-    glLoadMatrixf(camMatrix);
-
-    glTranslatef(5.f, 0, -10.f);
-    glRotatef(Clock.getElapsedTime().asSeconds() * 50, 0, 1, 0);
-    glScalef(0.1, 0.1, 0.1);
-
-    glColor3b(0, 0, 127);
-    drawCube();
     drawImage3D(translation, rotation, scale);
-    // glVertexPointer(2, GL_DOUBLE, 0, line);
-    // glEnableClientState(GL_VERTEX_ARRAY);
-    // glDrawArrays(GL_LINE_STRIP,0,N);
-}
-
-void keyPressedHandler()
-{
-
-}
-
-void keyReleasedHandler()
-{
-
 }
 
 void opengl_init(int argc, char** argv)
@@ -430,7 +362,8 @@ void opengl_init(int argc, char** argv)
 
     QMatrix4x4 test=Projection*(cam)*Model_View;
 */
-
+    float x0 = 0,y0 = 0;
+    Quaternionf q0 = cam.getRotation();
 
     // run the main loop
     bool running = true;
@@ -452,11 +385,23 @@ void opengl_init(int argc, char** argv)
             } break;
             case sf::Event::KeyPressed:
             {
-                // event.key.code
+                if(event.key.code == sf::Keyboard::Key::Escape)
+                {
+                    running = false;
+                }
             } break;
             case sf::Event::KeyReleased:
             {
 
+            } break;
+            case sf::Event::MouseButtonPressed:
+            {
+                if(event.mouseButton.button == sf::Mouse::Button::Right)
+                {
+                    x0 = sf::Mouse::getPosition().x;
+                    y0 = sf::Mouse::getPosition().y;
+                    q0 = cam.getRotation();
+                }
             } break;
             default:
                 break;
@@ -465,24 +410,22 @@ void opengl_init(int argc, char** argv)
 
         if(sf::Keyboard::isKeyPressed(sf::Keyboard::Key::W))
         {
-            cam.TranslateCam(Vector3f(0, 0, 0.1));
+            cam.TranslateCam(Vector3f(0, 0, 0.05));
         }
 
         if(sf::Keyboard::isKeyPressed(sf::Keyboard::Key::S))
         {
-            cam.TranslateCam(Vector3f(0, 0, -0.1));
+            cam.TranslateCam(Vector3f(0, 0, -0.05));
         }
 
         if(sf::Keyboard::isKeyPressed(sf::Keyboard::Key::A))
         {
-            float angle = -1 * M_PI / 180.0f;
-            cam.rotateCam(Quaternionf(cos(angle / 2), 0,sin(angle / 2),  0));
+            cam.TranslateCam(Vector3f(0.05, 0, 0));
         }
 
         if(sf::Keyboard::isKeyPressed(sf::Keyboard::Key::D))
         {
-            float angle = 1 * M_PI / 180.0f;
-            cam.rotateCam(Quaternionf(cos(angle / 2), 0, sin(angle / 2), 0));
+            cam.TranslateCam(Vector3f(-0.05, 0, 0));
         }
 
         if(sf::Keyboard::isKeyPressed(sf::Keyboard::Key::Q))
@@ -495,6 +438,20 @@ void opengl_init(int argc, char** argv)
             float angle = -0.5 * M_PI / 180.0f;
             cam.rotateCam(Quaternionf(cos(angle / 2), 0, 0, sin(angle / 2)));
         }
+
+        if(sf::Mouse::isButtonPressed(sf::Mouse::Button::Right))
+        {
+            sf::Vector2i mouse_pos = sf::Mouse::getPosition();
+            sf::Vector2u size =  window.getSize();
+            float x_rot = (mouse_pos.x - x0) / size.x / 1;
+            float y_rot = (mouse_pos.y - y0) / size.y / 1;
+            float w_rot = sqrt(1- x_rot*x_rot - y_rot*y_rot);
+            Quaternionf q (w_rot, y_rot, x_rot, 0);
+            q = q * q0;
+            q.normalize();
+            cam.setCamRotation(q);
+        }
+
         // sf::Mouse::getPosition
         // clear the buffers
         display(Clock);
@@ -514,6 +471,7 @@ void fillBuffer(cv::Mat& disparcityMap, cv::Mat& points, cv::Mat& colors)
     cout << "min map: " <<disparcityMapMin << endl;
 // opengl_current_bufer
 // point_buffer
+    point_buffer[opengl_current_bufer == 0 ? 1: 0].clear();
     switch(disparcityMap.type())
     {
     	case 0:
@@ -604,7 +562,26 @@ void fillBuffer(cv::Mat& disparcityMap, cv::Mat& points, cv::Mat& colors)
 
 int main(int argc, char** argv)
 {
-    cout << sizeof(DataFromReconstruct) << endl;
+
+    // Vector3<long double> eci_pos(51844.03160856166, 3976284.4625645634, 5643515.918517955);
+    // Vector3<long double> dir(-0.007509465053810284, -0.5759538424999008, -0.8174477226368699);
+
+    // cout << fixed << setw(50);
+    // cout.precision(10);
+    // cout << "\r\n";
+
+    // cout << coordiante_from_dir_and_point(eci_pos, dir) << "\r\n";
+
+    // float teeest = 1.e8 + 1.0f;
+    // cout << teeest << endl;
+    // return 0;
+
+    // // for(float i = 1.6e7 ; i < 1.7e7; i++)
+    // // {
+    // //     cout << i  << "\r\n";
+    // // }
+    // cout << 16777217.0000000000f  << "\r\n";
+    // return 0;
 
     string path = "../2022-08-27-13-18-52-calibration";
     vector <string> files;
@@ -629,7 +606,6 @@ int main(int argc, char** argv)
     Mat R2;
     Mat P1;
     Mat P2;
-    Mat  Q;
 
     StereoCalib["CM1"] >> CM1;
     StereoCalib["CM2"] >> CM2;
@@ -683,12 +659,10 @@ int main(int argc, char** argv)
 
         updateImage();
 
-        reprojectImageTo3D(disp, Out3D, Q);
-
         fillBuffer(disp, Out3D, imgU_L);
 
-        string filename_stem = std::filesystem::path(file).stem() ;
-        write_ply(path + "/ply/" + filename_stem + ".ply", disp, Out3D, imgU_L);
+        // string filename_stem = std::filesystem::path(file).stem() ;
+        // write_ply(path + "/ply/" + filename_stem + ".ply", disp, Out3D, imgU_L);
 
         if(wait)
         {

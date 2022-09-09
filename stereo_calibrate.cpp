@@ -184,9 +184,6 @@ int main()
         }
     }
 
-
-
-
     Mat cameraMatrix_L, distCoeffs_L;
     vector <Mat> R_L, T_L;
 
