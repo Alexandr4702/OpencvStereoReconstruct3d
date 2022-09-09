@@ -147,11 +147,13 @@ std::vector <DataFromReconstruct> point_buffer[2] = {
 };
 uint8_t opengl_current_bufer = 0;
 bool opengl_request_change_buffer = false;
+bool nextImage = false;
 
 void drawImage3D(Vector3f& translation, AngleAxisf& rotation, Vector3f& scale)
 {
     glLoadIdentity();
-    // glScalef(scale.x(), scale.y(), scale.z());
+
+    glScalef(scale.x(), scale.y(), scale.z());
     glRotatef(rotation.angle() * 180 / M_PI, rotation.axis().x(), rotation.axis().y(), rotation.axis().z());
     glTranslatef(translation.x(), translation.y(), translation.z());
 
@@ -389,6 +391,10 @@ void opengl_init(int argc, char** argv)
                     mainThreadExit = true;
                     openglExit = true;
                 }
+                if(event.key.code == sf::Keyboard::Key::N)
+                {
+                    nextImage = true;
+                }
             } break;
             case sf::Event::KeyReleased:
             {
@@ -463,11 +469,7 @@ void opengl_init(int argc, char** argv)
             cam.setCamRotation(q);
         }
 
-        // sf::Mouse::getPosition
-        // clear the buffers
         display(Clock);
-        // draw...
-        // end the current frame (internally swaps the front and back buffers)
         window.display();
     }
 }
@@ -662,6 +664,11 @@ int main(int argc, char** argv)
                 k = waitKey(10);
                 if(mainThreadExit)
                     break;
+                if(nextImage)
+                {
+                    nextImage = false;
+                    break;
+                }
             }
 
             if(k == 27)
