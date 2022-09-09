@@ -122,18 +122,18 @@ bool openglExit = false;
 
 // Creating an object of StereoSGBM algorithm
 cv::Ptr<cv::StereoSGBM> stereo = cv::StereoSGBM::create(
-	minDisparity,
-	numDisparities,
-	block_size,
-	P1,
-	P2,
-	disp12MaxDiff,
-	preFilterCap,
-	uniquenessRatio,
-	speckleWindowSize,
-	speckleRange,
-	StereoMode
-	);
+    minDisparity,
+    numDisparities,
+    block_size,
+    P1,
+    P2,
+    disp12MaxDiff,
+    preFilterCap,
+    uniquenessRatio,
+    speckleWindowSize,
+    speckleRange,
+    StereoMode
+    );
 
 Mat disp, disparity;
 Mat imgU_L, imgU_R;
@@ -330,7 +330,7 @@ void opengl_init(int argc, char** argv)
     sf::Clock Clock;
 
     //prepare OpenGL surface for HSR
-	glClearDepth(1.f);
+    glClearDepth(1.f);
     glClearColor(0.3f, 0.3f, 0.3f, 0.f);
     glEnable(GL_DEPTH_TEST);
     glDepthMask(GL_TRUE);
@@ -474,88 +474,88 @@ void fillBuffer(cv::Mat& disparcityMap, cv::Mat& points, cv::Mat& colors)
     point_buffer[opengl_current_bufer == 0 ? 1: 0].clear();
     switch(disparcityMap.type())
     {
-    	case 0:
-    	{
-			for (int y = 0; y < disparcityMap.rows; y++)
-				for (int x = 0; x < disparcityMap.cols; x++)
-					if(disparcityMap.at<uint8_t>(y, x) > disparcityMapMin)
+        case 0:
+        {
+            for (int y = 0; y < disparcityMap.rows; y++)
+                for (int x = 0; x < disparcityMap.cols; x++)
+                    if(disparcityMap.at<uint8_t>(y, x) > disparcityMapMin)
                     {
                         Vec3f vec = points.at <Vec3f> (y, x);
-						Vec3b col = colors.at <Vec3b> (y, x);
+                        Vec3b col = colors.at <Vec3b> (y, x);
                         point_buffer[opengl_current_bufer == 0 ? 1: 0].push_back({vec, col[0]});
                     }
-    	}break;
-    	case 1:
-    	{
-			for (int y = 0; y < disparcityMap.rows; y++)
-				for (int x = 0; x < disparcityMap.cols; x++)
-					if(disparcityMap.at<int8_t>(y, x) > disparcityMapMin)
+        }break;
+        case 1:
+        {
+            for (int y = 0; y < disparcityMap.rows; y++)
+                for (int x = 0; x < disparcityMap.cols; x++)
+                    if(disparcityMap.at<int8_t>(y, x) > disparcityMapMin)
                     {
                         Vec3f vec = points.at <Vec3f> (y, x);
-						Vec3b col = colors.at <Vec3b> (y, x);
+                        Vec3b col = colors.at <Vec3b> (y, x);
                         point_buffer[opengl_current_bufer == 0 ? 1: 0].push_back({vec, col[0]});
                     }
-    	}break;
-    	case 2:
-    	{
-			for (int y = 0; y < disparcityMap.rows; y++)
-				for (int x = 0; x < disparcityMap.cols; x++)
-					if(disparcityMap.at<uint16_t>(y, x) > disparcityMapMin)
+        }break;
+        case 2:
+        {
+            for (int y = 0; y < disparcityMap.rows; y++)
+                for (int x = 0; x < disparcityMap.cols; x++)
+                    if(disparcityMap.at<uint16_t>(y, x) > disparcityMapMin)
                     {
                         Vec3f vec = points.at <Vec3f> (y, x);
-						Vec3b col = colors.at <Vec3b> (y, x);
+                        Vec3b col = colors.at <Vec3b> (y, x);
                         point_buffer[opengl_current_bufer == 0 ? 1: 0].push_back({vec, col[0]});
                     }
-    	}break;
-    	case 3:
-    	{
-			for (int y = 0; y < disparcityMap.rows; y++)
-				for (int x = 0; x < disparcityMap.cols; x++)
-					if(disparcityMap.at<int16_t>(y, x) > disparcityMapMin)
+        }break;
+        case 3:
+        {
+            for (int y = 0; y < disparcityMap.rows; y++)
+                for (int x = 0; x < disparcityMap.cols; x++)
+                    if(disparcityMap.at<int16_t>(y, x) > disparcityMapMin)
                     {
                         Vec3f vec = points.at <Vec3f> (y, x);
-						Vec3b col = colors.at <Vec3b> (y, x);
+                        Vec3b col = colors.at <Vec3b> (y, x);
                         point_buffer[opengl_current_bufer == 0 ? 1: 0].push_back({vec, col[0]});
                     }
-    	}break;
-    	case 4:
-    	{
-			for (int y = 0; y < disparcityMap.rows; y++)
-				for (int x = 0; x < disparcityMap.cols; x++)
-					if(disparcityMap.at<int32_t>(y, x) > disparcityMapMin)
+        }break;
+        case 4:
+        {
+            for (int y = 0; y < disparcityMap.rows; y++)
+                for (int x = 0; x < disparcityMap.cols; x++)
+                    if(disparcityMap.at<int32_t>(y, x) > disparcityMapMin)
                     {
                         Vec3f vec = points.at <Vec3f> (y, x);
-						Vec3b col = colors.at <Vec3b> (y, x);
+                        Vec3b col = colors.at <Vec3b> (y, x);
                         point_buffer[opengl_current_bufer == 0 ? 1: 0].push_back({vec, col[0]});
                     }
-    	}break;
-    	case 5:
-    	{
-			for (int y = 0; y < disparcityMap.rows; y++)
-				for (int x = 0; x < disparcityMap.cols; x++)
-					if(disparcityMap.at<float>(y, x) > disparcityMapMin)
+        }break;
+        case 5:
+        {
+            for (int y = 0; y < disparcityMap.rows; y++)
+                for (int x = 0; x < disparcityMap.cols; x++)
+                    if(disparcityMap.at<float>(y, x) > disparcityMapMin)
                     {
                         Vec3f vec = points.at <Vec3f> (y, x);
-						uint8_t col = colors.at <uint8_t> (y, x);
+                        uint8_t col = colors.at <uint8_t> (y, x);
                         point_buffer[opengl_current_bufer == 0 ? 1: 0].push_back({vec, col});
                     }
-    	}break;
-    	case 6:
-    	{
-			for (int y = 0; y < disparcityMap.rows; y++)
-				for (int x = 0; x < disparcityMap.cols; x++)
-					if(disparcityMap.at<double>(y, x) > disparcityMapMin)
+        }break;
+        case 6:
+        {
+            for (int y = 0; y < disparcityMap.rows; y++)
+                for (int x = 0; x < disparcityMap.cols; x++)
+                    if(disparcityMap.at<double>(y, x) > disparcityMapMin)
                     {
                         Vec3f vec = points.at <Vec3f> (y, x);
-						Vec3b col = colors.at <Vec3b> (y, x);
+                        Vec3b col = colors.at <Vec3b> (y, x);
                         point_buffer[opengl_current_bufer == 0 ? 1: 0].push_back({vec, col[0]});
                     }
-    	}break;
-    	default:
-    	{
-    		cerr << "Incorrect disparcity map" << endl;
-    		return;
-    	};
+        }break;
+        default:
+        {
+            cerr << "Incorrect disparcity map" << endl;
+            return;
+        };
     }
     opengl_current_bufer = opengl_current_bufer == 0 ? 1: 0;
 }
