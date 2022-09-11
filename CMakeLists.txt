@@ -12,7 +12,7 @@ find_package(OpenGL REQUIRED)
 include_directories( ${OPENGL_INCLUDE_DIRS})
 
 add_executable(calibrate3D stereo_calibrate.cpp)
-target_link_libraries( calibrate3D ${OpenCV_LIBS} )
+target_link_libraries( calibrate3D ${OpenCV_LIBS} -lpthread -lstdc++fs)
 
 add_executable(reconstruct stereoReconstruct.cpp)
 target_link_libraries( reconstruct ${OpenCV_LIBS} ${OPENGL_LIBRARIES} ${GLUT_LIBRARY} -lGL -lGLU -lsfml-graphics -lsfml-window -lsfml-system)
