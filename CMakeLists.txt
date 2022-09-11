@@ -7,8 +7,9 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
 find_package(OpenCV REQUIRED )
 find_package(OpenGL REQUIRED)
+find_package(GLUT REQUIRED)
 
-#include_directories( ${OpenCV_INCLUDE_DIRS})
+include_directories( ${OpenCV_INCLUDE_DIRS})
 include_directories( ${OPENGL_INCLUDE_DIRS})
 
 add_executable(calibrate3D stereo_calibrate.cpp)

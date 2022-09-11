@@ -13,8 +13,8 @@
 #include "opencv-helper.hpp"
 
 #include <GL/gl.h>
-#include <GL/freeglut.h>
-#include <GLFW/glfw3.h>
+#include <GL/glut.h>
+//#include <GLFW/glfw3.h>
 
 #include <SFML/Window.hpp>
 #include <SFML/OpenGL.hpp>
