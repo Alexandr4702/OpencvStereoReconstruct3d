@@ -4,6 +4,7 @@
 #include <fstream>
 #include <thread>
 #include <math.h>
+#include <mutex>
 
 #include <opencv2/core.hpp>
 #include <opencv2/calib3d.hpp>
@@ -14,15 +15,13 @@
 
 #include <GL/gl.h>
 #include <GL/glut.h>
-//#include <GLFW/glfw3.h>
 
 #include <SFML/Window.hpp>
 #include <SFML/OpenGL.hpp>
 #include <SFML/Graphics.hpp>
-// #include <SFML/Keyboard.hpp>
 
-#include <eigen3/Eigen/Core>
-#include <eigen3/Eigen/Geometry>
+#include "./eigen/Eigen/Core"
+#include "./eigen/Eigen/Geometry"
 
 using namespace std;
 using namespace cv;
