@@ -94,7 +94,7 @@ int main(int argc, char **argv) {
 
         char ret = waitKey(5);
 
-        if (ret == 'q')
+        if (ret == 'q' || ret == 27)
             break;
         if (ret == 32)
         {
