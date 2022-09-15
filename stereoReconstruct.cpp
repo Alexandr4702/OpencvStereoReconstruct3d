@@ -175,7 +175,7 @@ void updateImage()
     disparity = (disp - (float)minDisparity)/((float)numDisparities);
     reprojectImageTo3D(disp, Out3D, Q);
     fillBuffer(disp, Out3D, imgU_L);
-    imshow("disparity", disparity);
+    // imshow("disparity", disparity);
 }
 
 static void minDisparity_CB( int val, void* )
@@ -473,14 +473,45 @@ void opengl_init(int argc, char** argv)
     }
 }
 
+class TimeMeasure
+{
+public:
+    TimeMeasure()
+    {
+        start = std::chrono::system_clock::now();
+    }
+    TimeMeasure(double* save)
+    {
+        save_diff = save;
+        start = std::chrono::system_clock::now();
+    }
+    ~TimeMeasure()
+    {
+        stop = std::chrono::system_clock::now();
+        auto diff = stop - start;
+        if(save_diff)
+            *save_diff = std::chrono::duration_cast<std::chrono::microseconds>(diff).count();
+        std::cout << "Time in microsec: " << std::chrono::duration_cast<std::chrono::microseconds>(diff).count() << std::endl;
+    }
+private:
+    double* save_diff = nullptr;
+    std::chrono::system_clock::time_point start;
+    std::chrono::system_clock::time_point stop;
+};
+
 void fillBuffer(cv::Mat& disparcityMap, cv::Mat& points, cv::Mat& colors)
 {
+    TimeMeasure time;
+
     double disparcityMapMin;
     minMaxLoc(disparcityMap, &disparcityMapMin);
     cout << "min map: " <<disparcityMapMin << endl;
-// opengl_current_bufer
-// point_buffer
-    point_buffer[opengl_current_bufer == 0 ? 1: 0].clear();
+
+    std::vector <DataFromReconstruct>& current_buffer = point_buffer[opengl_current_bufer == 0 ? 1: 0];
+    current_buffer.clear();
+    Mat mask = disparcityMap > disparcityMapMin;
+    current_buffer.reserve(static_cast<size_t>(cv::sum(mask)[0]));
+
     switch(disparcityMap.type())
     {
         case 0:
@@ -491,7 +522,7 @@ void fillBuffer(cv::Mat& disparcityMap, cv::Mat& points, cv::Mat& colors)
                     {
                         Vec3f vec = points.at <Vec3f> (y, x);
                         Vec3b col = colors.at <Vec3b> (y, x);
-                        point_buffer[opengl_current_bufer == 0 ? 1: 0].push_back({vec, col[0]});
+                        current_buffer.push_back({vec, col[0]});
                     }
         }break;
         case 1:
@@ -502,7 +533,7 @@ void fillBuffer(cv::Mat& disparcityMap, cv::Mat& points, cv::Mat& colors)
                     {
                         Vec3f vec = points.at <Vec3f> (y, x);
                         Vec3b col = colors.at <Vec3b> (y, x);
-                        point_buffer[opengl_current_bufer == 0 ? 1: 0].push_back({vec, col[0]});
+                        current_buffer.push_back({vec, col[0]});
                     }
         }break;
         case 2:
@@ -513,7 +544,7 @@ void fillBuffer(cv::Mat& disparcityMap, cv::Mat& points, cv::Mat& colors)
                     {
                         Vec3f vec = points.at <Vec3f> (y, x);
                         Vec3b col = colors.at <Vec3b> (y, x);
-                        point_buffer[opengl_current_bufer == 0 ? 1: 0].push_back({vec, col[0]});
+                        current_buffer.push_back({vec, col[0]});
                     }
         }break;
         case 3:
@@ -524,7 +555,7 @@ void fillBuffer(cv::Mat& disparcityMap, cv::Mat& points, cv::Mat& colors)
                     {
                         Vec3f vec = points.at <Vec3f> (y, x);
                         Vec3b col = colors.at <Vec3b> (y, x);
-                        point_buffer[opengl_current_bufer == 0 ? 1: 0].push_back({vec, col[0]});
+                        current_buffer.push_back({vec, col[0]});
                     }
         }break;
         case 4:
@@ -535,7 +566,7 @@ void fillBuffer(cv::Mat& disparcityMap, cv::Mat& points, cv::Mat& colors)
                     {
                         Vec3f vec = points.at <Vec3f> (y, x);
                         Vec3b col = colors.at <Vec3b> (y, x);
-                        point_buffer[opengl_current_bufer == 0 ? 1: 0].push_back({vec, col[0]});
+                        current_buffer.push_back({vec, col[0]});
                     }
         }break;
         case 5:
@@ -546,7 +577,7 @@ void fillBuffer(cv::Mat& disparcityMap, cv::Mat& points, cv::Mat& colors)
                     {
                         Vec3f vec = points.at <Vec3f> (y, x);
                         uint8_t col = colors.at <uint8_t> (y, x);
-                        point_buffer[opengl_current_bufer == 0 ? 1: 0].push_back({vec, col});
+                        current_buffer.push_back({vec, col});
                     }
         }break;
         case 6:
@@ -557,7 +588,7 @@ void fillBuffer(cv::Mat& disparcityMap, cv::Mat& points, cv::Mat& colors)
                     {
                         Vec3f vec = points.at <Vec3f> (y, x);
                         Vec3b col = colors.at <Vec3b> (y, x);
-                        point_buffer[opengl_current_bufer == 0 ? 1: 0].push_back({vec, col[0]});
+                        current_buffer.push_back({vec, col[0]});
                     }
         }break;
         default:
@@ -647,20 +678,18 @@ int main(int argc, char** argv)
 
         updateImage();
 
-        fillBuffer(disp, Out3D, imgU_L);
-
         // string filename_stem = std::filesystem::path(file).stem() ;
         // write_ply(path + "/ply/" + filename_stem + ".ply", disp, Out3D, imgU_L);
 
         if(wait)
         {
-            imshow(file + "_L", imgU_L);
-            imshow(file + "_R", imgU_R);
+            // imshow(file + "_L", imgU_L);
+            // imshow(file + "_R", imgU_R);
 
             char k = waitKey(10);
             while(k == -1)
             {
-                k = waitKey(10);
+                k = waitKey(40);
                 if(mainThreadExit)
                     break;
                 if(nextImage)
@@ -682,8 +711,8 @@ int main(int argc, char** argv)
                 openglExit = true;
                 continue;
             }
-            destroyWindow(file + "_L");
-            destroyWindow(file + "_R");
+            // destroyWindow(file + "_L");
+            // destroyWindow(file + "_R");
         }
         if(mainThreadExit)
             break;
