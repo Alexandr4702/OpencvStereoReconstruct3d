@@ -13,8 +13,8 @@
 #include <opencv2/imgproc.hpp>
 #include "opencv-helper.hpp"
 
-#include <GL/gl.h>
-#include <GL/glut.h>
+#include <GL/glew.h>
+#include <GL/freeglut.h>
 
 #include <SFML/Window.hpp>
 #include <SFML/OpenGL.hpp>
@@ -31,12 +31,13 @@ using std::filesystem::directory_iterator;
 
 void drawCube();
 void drawPoint();
+void updateImage();
 void fillBuffer(cv::Mat& disparcityMap, cv::Mat& points, cv::Mat& colors);
 
 class DataFromReconstruct
 {
 public:
-DataFromReconstruct(Vec3f& pos, uint8_t color):color0(color / 255.0f), color1(color / 255.0f), color2(color / 255.0f)
+DataFromReconstruct(Vec3f& pos, uint8_t color):color0(color / 255.0f)
 {
     x = pos[0];
     y = pos[1];
@@ -94,6 +95,16 @@ class Camera
         scoped_lock guard(mtx);
         scale += scal;
     }
+    Eigen::Matrix4f getCameraMatrix()
+    {
+        Eigen::Affine3f CamMatrix;
+        CamMatrix.setIdentity();
+        CamMatrix.scale(scale);
+        CamMatrix.rotate(rotation);
+        CamMatrix.translate(translation);
+
+        return CamMatrix.matrix();
+    }
     private:
     Vector3f translation{0, 0, 1};
     Quaternionf rotation = Quaternionf(0, 0, 1, 0);
@@ -148,35 +159,6 @@ uint8_t opengl_current_bufer = 0;
 bool opengl_request_change_buffer = false;
 bool nextImage = false;
 
-void drawImage3D(Vector3f& translation, AngleAxisf& rotation, Vector3f& scale)
-{
-    glLoadIdentity();
-
-    glScalef(scale.x(), scale.y(), scale.z());
-    glRotatef(rotation.angle() * 180 / M_PI, rotation.axis().x(), rotation.axis().y(), rotation.axis().z());
-    glTranslatef(translation.x(), translation.y(), translation.z());
-
-    glVertexPointer(3, GL_FLOAT, sizeof(point_buffer[opengl_current_bufer][0]), &point_buffer[opengl_current_bufer][0].x);
-    glEnableClientState(GL_VERTEX_ARRAY);
-
-    glColorPointer(3, GL_FLOAT, sizeof(point_buffer[opengl_current_bufer][0]), &point_buffer[opengl_current_bufer][0].color0);
-    glEnableClientState(GL_COLOR_ARRAY);
-
-    glPointSize(5);
-
-    glDrawArrays(GL_POINTS, 0, point_buffer[opengl_current_bufer].size());
-}
-
-void updateImage()
-{
-    stereo->compute(imgU_L, imgU_R, disp);
-    disp.convertTo(disp, CV_32F, 1.0);
-    disp /= 16.0f;
-    disparity = (disp - (float)minDisparity)/((float)numDisparities);
-    reprojectImageTo3D(disp, Out3D, Q);
-    fillBuffer(disp, Out3D, imgU_L);
-    // imshow("disparity", disparity);
-}
 
 static void minDisparity_CB( int val, void* )
 {
@@ -261,6 +243,77 @@ static void fullDP_CB( int val, void* )
     updateImage();
 }
 
+Eigen::Matrix4f projective_matrix(float fovY, float aspectRatio, float zNear, float zFar)
+{
+    float yScale = 1 / tan(fovY * M_PI / 360.0f);
+    float xScale = yScale / aspectRatio;
+
+    // float yScale = 1;
+    // float xScale = 1;
+
+    Eigen::Matrix4f pmat;
+    pmat << xScale, 0, 0, 0,
+            0, yScale, 0, 0,
+            0, 0, -(zFar+zNear)/(zFar-zNear), -2*zNear*zFar/(zFar-zNear),
+            0, 0, -1, 0;
+    return pmat;
+}
+
+void drawImage3D(Vector3f& translation, AngleAxisf& rotation, Vector3f& scale, sf::Shader& shader)
+{
+    glLoadIdentity();
+
+    // glScalef(scale.x(), scale.y(), scale.z());
+    // glRotatef(rotation.angle() * 180 / M_PI, rotation.axis().x(), rotation.axis().y(), rotation.axis().z());
+    // glTranslatef(translation.x(), translation.y(), translation.z());
+
+    /*
+    Model_View.setToIdentity();
+    Model_View.translate(position);
+    Model_View.rotate(orenation);
+    Model_View.scale(scale);
+
+    QMatrix4x4 test=Projection*(cam)*Model_View;
+*/
+
+    Eigen::Matrix4f projective = projective_matrix(60.f, 1.f, 01.f, 100.0f) * cam.getCameraMatrix();
+
+    sf::Glsl::Mat4 dsa(projective.data());
+
+    shader.setUniform("mvp_matrix", dsa);
+
+    sf::Shader::bind(&shader);
+
+    glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, sizeof(point_buffer[opengl_current_bufer][0]), &point_buffer[opengl_current_bufer][0].x);
+    glEnableVertexAttribArray(0);
+
+    // glVertexPointer(3, GL_FLOAT, sizeof(point_buffer[opengl_current_bufer][0]), &point_buffer[opengl_current_bufer][0].x);
+    // glEnableClientState(GL_VERTEX_ARRAY);
+
+    glVertexAttribPointer(1, 1, GL_FLOAT, GL_FALSE, sizeof(point_buffer[opengl_current_bufer][0]), &point_buffer[opengl_current_bufer][0].color0);
+    glEnableVertexAttribArray(1);
+
+    // glColorPointer(3, GL_FLOAT, sizeof(point_buffer[opengl_current_bufer][0]), &point_buffer[opengl_current_bufer][0].color0);
+    // glEnableClientState(GL_COLOR_ARRAY);
+
+    glPointSize(5);
+
+    glDrawArrays(GL_POINTS, 0, point_buffer[opengl_current_bufer].size());
+
+    // drawCube();
+}
+
+void updateImage()
+{
+    stereo->compute(imgU_L, imgU_R, disp);
+    disp.convertTo(disp, CV_32F, 1.0);
+    disp /= 16.0f;
+    disparity = (disp - (float)minDisparity)/((float)numDisparities);
+    reprojectImageTo3D(disp, Out3D, Q);
+    fillBuffer(disp, Out3D, imgU_L);
+    // imshow("disparity", disparity);
+}
+
 void drawCube()
 {
     double vertex[] =
@@ -301,7 +354,7 @@ void drawCube()
     glDrawArrays(GL_QUADS, 0, 24);
 }
 
-void display(sf::Clock& Clock)
+void display(sf::Clock& Clock, sf::Shader& shader )
 {
     Vector3f translation = cam.getTranslation();
     AngleAxisf rotation  = AngleAxisf(cam.getRotation());
@@ -313,164 +366,8 @@ void display(sf::Clock& Clock)
 
     glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
-    // Apply some transformations for the cube
     glMatrixMode(GL_MODELVIEW);
-    drawImage3D(translation, rotation, scale);
-}
-
-void opengl_init(int argc, char** argv)
-{
-    // create the window
-    sf::Window window(sf::VideoMode(800, 600), "OpenGL", sf::Style::Default, sf::ContextSettings(32));
-    window.setVerticalSyncEnabled(true);
-
-    // activate the window
-    window.setActive(true);
-
-    // load resources, initialize the OpenGL states, ...
-    // Create a clock for measuring time elapsed
-    sf::Clock Clock;
-
-    //prepare OpenGL surface for HSR
-    glClearDepth(1.f);
-    glClearColor(0.3f, 0.3f, 0.3f, 0.f);
-    glEnable(GL_DEPTH_TEST);
-    glDepthMask(GL_TRUE);
-
-    //// Setup a perspective projection & Camera position
-    glMatrixMode(GL_PROJECTION);
-    glLoadIdentity();
-    gluPerspective(60.f, 1.f, 01.f, 100.0f);//fov, aspect, zNear, zFar
-    // glOrtho(-1, 1, -1, 1, -100, 100);
-    sf::Shader shader;
-
-    if (!shader.loadFromFile("../vertex_shader.vert", sf::Shader::Vertex))
-    {
-        cout << "Can't load vertex shader\r\n";
-        return;
-    }
-
-    if (!shader.loadFromFile("../fragment_shader.frag", sf::Shader::Fragment))
-    {
-        cout << "Can't load fragment shader\r\n";
-        return;
-    }
-
-/*
-    Model_View.setToIdentity();
-    Model_View.translate(position);
-    Model_View.rotate(orenation);
-    Model_View.scale(scale);
-
-    QMatrix4x4 test=Projection*(cam)*Model_View;
-*/
-    float x0 = 0,y0 = 0;
-    Quaternionf q0 = cam.getRotation();
-
-    while (!openglExit)
-    {
-        // handle events
-        sf::Event event;
-        while (window.pollEvent(event))
-        {
-            switch (event.type )
-            {
-            case sf::Event::Closed:
-            {
-                openglExit = true;
-            } break;
-            case sf::Event::Resized:
-            {
-                glViewport(0, 0, event.size.width, event.size.height);
-            } break;
-            case sf::Event::KeyPressed:
-            {
-                if(event.key.code == sf::Keyboard::Key::Escape)
-                {
-                    mainThreadExit = true;
-                    openglExit = true;
-                }
-                if(event.key.code == sf::Keyboard::Key::N)
-                {
-                    nextImage = true;
-                }
-            } break;
-            case sf::Event::KeyReleased:
-            {
-
-            } break;
-            case sf::Event::MouseButtonPressed:
-            {
-                if(event.mouseButton.button == sf::Mouse::Button::Right)
-                {
-                    x0 = sf::Mouse::getPosition().x;
-                    y0 = sf::Mouse::getPosition().y;
-                    q0 = cam.getRotation();
-                }
-            } break;
-            default:
-                break;
-            }
-        }
-
-        if(sf::Keyboard::isKeyPressed(sf::Keyboard::Key::W))
-        {
-            cam.TranslateCam(Vector3f(0, 0, 0.05));
-        }
-
-        if(sf::Keyboard::isKeyPressed(sf::Keyboard::Key::S))
-        {
-            cam.TranslateCam(Vector3f(0, 0, -0.05));
-        }
-
-        if(sf::Keyboard::isKeyPressed(sf::Keyboard::Key::A))
-        {
-            cam.TranslateCam(Vector3f(0.05, 0, 0));
-        }
-
-        if(sf::Keyboard::isKeyPressed(sf::Keyboard::Key::D))
-        {
-            cam.TranslateCam(Vector3f(-0.05, 0, 0));
-        }
-
-        if(sf::Keyboard::isKeyPressed(sf::Keyboard::Key::LShift))
-        {
-            cam.TranslateCam(Vector3f( 0, 0.05, 0));
-        }
-
-        if(sf::Keyboard::isKeyPressed(sf::Keyboard::Key::Space))
-        {
-            cam.TranslateCam(Vector3f(0, -0.05, 0));
-        }
-
-        if(sf::Keyboard::isKeyPressed(sf::Keyboard::Key::Q))
-        {
-            float angle = 0.5 * M_PI / 180.0f;
-            cam.rotateCam(Quaternionf(cos(angle / 2), 0, 0, sin(angle / 2)));
-        }
-
-        if(sf::Keyboard::isKeyPressed(sf::Keyboard::Key::E))
-        {
-            float angle = -0.5 * M_PI / 180.0f;
-            cam.rotateCam(Quaternionf(cos(angle / 2), 0, 0, sin(angle / 2)));
-        }
-
-        if(sf::Mouse::isButtonPressed(sf::Mouse::Button::Right))
-        {
-            sf::Vector2i mouse_pos = sf::Mouse::getPosition();
-            sf::Vector2u size =  window.getSize();
-            float x_rot = (mouse_pos.x - x0) / size.x / 1;
-            float y_rot = (mouse_pos.y - y0) / size.y / 1;
-            float w_rot = sqrt(1- x_rot*x_rot - y_rot*y_rot);
-            Quaternionf q (w_rot, y_rot, x_rot, 0);
-            q = q * q0;
-            q.normalize();
-            cam.setCamRotation(q);
-        }
-
-        display(Clock);
-        window.display();
-    }
+    drawImage3D(translation, rotation, scale, shader);
 }
 
 class TimeMeasure
@@ -598,6 +495,154 @@ void fillBuffer(cv::Mat& disparcityMap, cv::Mat& points, cv::Mat& colors)
         };
     }
     opengl_current_bufer = opengl_current_bufer == 0 ? 1: 0;
+}
+
+void opengl_init(int argc, char** argv)
+{
+    // create the window
+    sf::Window window(sf::VideoMode(800, 600), "OpenGL", sf::Style::Default, sf::ContextSettings(32));
+    window.setVerticalSyncEnabled(true);
+
+    // activate the window
+    window.setActive(true);
+
+    // load resources, initialize the OpenGL states, ...
+    // Create a clock for measuring time elapsed
+    sf::Clock Clock;
+
+    //prepare OpenGL surface for HSR
+    glClearDepth(1.f);
+    glClearColor(0.3f, 0.3f, 0.3f, 0.f);
+    glEnable(GL_DEPTH_TEST);
+    glDepthMask(GL_TRUE);
+
+    //// Setup a perspective projection & Camera position
+    glMatrixMode(GL_PROJECTION);
+    glLoadIdentity();
+    gluPerspective(60.f, 1.f, 01.f, 100.0f);//fov, aspect, zNear, zFar
+    // glOrtho(-1, 1, -1, 1, -100, 100);
+    sf::Shader shader;
+    glewInit();
+
+    if (!shader.loadFromFile("../vertex_shader.vert", "../fragment_shader.frag"))
+    {
+        cout << "Can't load vertex shader\r\n";
+        return;
+    }
+
+    // if (!shader.loadFromFile("../fragment_shader.frag", sf::Shader::Fragment))
+    // {
+    //     cout << "Can't load fragment shader\r\n";
+    //     return;
+    // }
+
+    float x0 = 0,y0 = 0;
+    Quaternionf q0 = cam.getRotation();
+
+    while (!openglExit)
+    {
+        // handle events
+        sf::Event event;
+        while (window.pollEvent(event))
+        {
+            switch (event.type )
+            {
+            case sf::Event::Closed:
+            {
+                openglExit = true;
+            } break;
+            case sf::Event::Resized:
+            {
+                glViewport(0, 0, event.size.width, event.size.height);
+            } break;
+            case sf::Event::KeyPressed:
+            {
+                if(event.key.code == sf::Keyboard::Key::Escape)
+                {
+                    mainThreadExit = true;
+                    openglExit = true;
+                }
+                if(event.key.code == sf::Keyboard::Key::N)
+                {
+                    nextImage = true;
+                }
+            } break;
+            case sf::Event::KeyReleased:
+            {
+
+            } break;
+            case sf::Event::MouseButtonPressed:
+            {
+                if(event.mouseButton.button == sf::Mouse::Button::Right)
+                {
+                    x0 = sf::Mouse::getPosition().x;
+                    y0 = sf::Mouse::getPosition().y;
+                    q0 = cam.getRotation();
+                }
+            } break;
+            default:
+                break;
+            }
+        }
+
+        if(sf::Keyboard::isKeyPressed(sf::Keyboard::Key::W))
+        {
+            cam.TranslateCam(Vector3f(0, 0, 0.05));
+        }
+
+        if(sf::Keyboard::isKeyPressed(sf::Keyboard::Key::S))
+        {
+            cam.TranslateCam(Vector3f(0, 0, -0.05));
+        }
+
+        if(sf::Keyboard::isKeyPressed(sf::Keyboard::Key::A))
+        {
+            cam.TranslateCam(Vector3f(0.05, 0, 0));
+        }
+
+        if(sf::Keyboard::isKeyPressed(sf::Keyboard::Key::D))
+        {
+            cam.TranslateCam(Vector3f(-0.05, 0, 0));
+        }
+
+        if(sf::Keyboard::isKeyPressed(sf::Keyboard::Key::LShift))
+        {
+            cam.TranslateCam(Vector3f( 0, 0.05, 0));
+        }
+
+        if(sf::Keyboard::isKeyPressed(sf::Keyboard::Key::Space))
+        {
+            cam.TranslateCam(Vector3f(0, -0.05, 0));
+        }
+
+        if(sf::Keyboard::isKeyPressed(sf::Keyboard::Key::Q))
+        {
+            float angle = 0.5 * M_PI / 180.0f;
+            cam.rotateCam(Quaternionf(cos(angle / 2), 0, 0, sin(angle / 2)));
+        }
+
+        if(sf::Keyboard::isKeyPressed(sf::Keyboard::Key::E))
+        {
+            float angle = -0.5 * M_PI / 180.0f;
+            cam.rotateCam(Quaternionf(cos(angle / 2), 0, 0, sin(angle / 2)));
+        }
+
+        if(sf::Mouse::isButtonPressed(sf::Mouse::Button::Right))
+        {
+            sf::Vector2i mouse_pos = sf::Mouse::getPosition();
+            sf::Vector2u size =  window.getSize();
+            float x_rot = (mouse_pos.x - x0) / size.x / 1;
+            float y_rot = (mouse_pos.y - y0) / size.y / 1;
+            float w_rot = sqrt(1- x_rot*x_rot - y_rot*y_rot);
+            Quaternionf q (w_rot, y_rot, x_rot, 0);
+            q = q * q0;
+            q.normalize();
+            cam.setCamRotation(q);
+        }
+
+        display(Clock, shader);
+        window.display();
+    }
 }
 
 int main(int argc, char** argv)

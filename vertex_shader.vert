@@ -1,15 +1,11 @@
-#ifdef GL_ES
-precision mediump int;
-precision mediump float;
-#endif
-
+#version 330 core
+layout (location = 0) in vec3 position;
+layout (location = 1) in float in_color;
 uniform mat4 mvp_matrix;
-
-attribute vec4 a_position;
 
 varying vec4 color;
 void main()
 {
-    gl_Position = mvp_matrix * a_position;
-    color=vec4(clamp(a_position[0],0.1,1.0),clamp(a_position[1],0.1,1.0),clamp(a_position[2],0.1,1.0),1);
+    gl_Position = mvp_matrix * vec4(position, 1.0);
+    color = vec4(in_color, in_color, in_color, 1.0);//vec4(clamp(gl_Position[0],0.1,1.0),clamp(gl_Position[1],0.1,1.0),clamp(gl_Position[2],0.1,1.0),1);
 }
