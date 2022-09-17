@@ -43,6 +43,12 @@ DataFromReconstruct(Vec3f& pos, uint8_t color):color0(color / 255.0f)
     y = pos[1];
     z = pos[2];
 }
+DataFromReconstruct(Vector3f& pos, uint8_t color):color0(color / 255.0f)
+{
+    x = pos[0];
+    y = pos[1];
+    z = pos[2];
+}
 float x;
 float y;
 float z;
@@ -112,6 +118,32 @@ class Camera
     std::mutex mtx;
 };
 
+class TimeMeasure
+{
+public:
+    TimeMeasure()
+    {
+        start = std::chrono::system_clock::now();
+    }
+    TimeMeasure(double* save)
+    {
+        save_diff = save;
+        start = std::chrono::system_clock::now();
+    }
+    ~TimeMeasure()
+    {
+        stop = std::chrono::system_clock::now();
+        auto diff = stop - start;
+        if(save_diff)
+            *save_diff = std::chrono::duration_cast<std::chrono::microseconds>(diff).count();
+        std::cout << "Time in microsec: " << std::chrono::duration_cast<std::chrono::microseconds>(diff).count() << std::endl;
+    }
+private:
+    double* save_diff = nullptr;
+    std::chrono::system_clock::time_point start;
+    std::chrono::system_clock::time_point stop;
+};
+
 Camera cam;
 
 int window_size = 5;
@@ -155,6 +187,15 @@ std::vector <DataFromReconstruct> point_buffer[2] = {
     {},
     {}
 };
+
+std::vector <Vector3f> vertex_point_buffer[2] = {
+    {}
+};
+
+std::vector <uint8_t> color_point_buffer[2] = {
+    {}
+};
+
 uint8_t opengl_current_bufer = 0;
 bool opengl_request_change_buffer = false;
 bool nextImage = false;
@@ -284,34 +325,31 @@ void drawImage3D(Vector3f& translation, AngleAxisf& rotation, Vector3f& scale, s
 
     sf::Shader::bind(&shader);
 
-    glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, sizeof(point_buffer[opengl_current_bufer][0]), &point_buffer[opengl_current_bufer][0].x);
+    glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 0, &vertex_point_buffer[opengl_current_bufer][0][0]);
     glEnableVertexAttribArray(0);
 
     // glVertexPointer(3, GL_FLOAT, sizeof(point_buffer[opengl_current_bufer][0]), &point_buffer[opengl_current_bufer][0].x);
     // glEnableClientState(GL_VERTEX_ARRAY);
 
-    glVertexAttribPointer(1, 1, GL_FLOAT, GL_FALSE, sizeof(point_buffer[opengl_current_bufer][0]), &point_buffer[opengl_current_bufer][0].color0);
+    glVertexAttribPointer(1, 1, GL_UNSIGNED_BYTE, GL_FALSE, 0, &color_point_buffer[opengl_current_bufer][0]);
     glEnableVertexAttribArray(1);
 
     // glColorPointer(3, GL_FLOAT, sizeof(point_buffer[opengl_current_bufer][0]), &point_buffer[opengl_current_bufer][0].color0);
     // glEnableClientState(GL_COLOR_ARRAY);
 
     glPointSize(5);
-
-    glDrawArrays(GL_POINTS, 0, point_buffer[opengl_current_bufer].size());
+    glDrawArrays(GL_POINTS, 0, vertex_point_buffer[opengl_current_bufer].size());
 
     // drawCube();
 }
 
 void updateImage()
 {
+    TimeMeasure time;
     stereo->compute(imgU_L, imgU_R, disp);
-    disp.convertTo(disp, CV_32F, 1.0);
-    disp /= 16.0f;
-    disparity = (disp - (float)minDisparity)/((float)numDisparities);
+    disp.convertTo(disp, CV_32F, 1.0f / 16.0f);
     reprojectImageTo3D(disp, Out3D, Q);
     fillBuffer(disp, Out3D, imgU_L);
-    // imshow("disparity", disparity);
 }
 
 void drawCube()
@@ -370,131 +408,37 @@ void display(sf::Clock& Clock, sf::Shader& shader )
     drawImage3D(translation, rotation, scale, shader);
 }
 
-class TimeMeasure
-{
-public:
-    TimeMeasure()
-    {
-        start = std::chrono::system_clock::now();
-    }
-    TimeMeasure(double* save)
-    {
-        save_diff = save;
-        start = std::chrono::system_clock::now();
-    }
-    ~TimeMeasure()
-    {
-        stop = std::chrono::system_clock::now();
-        auto diff = stop - start;
-        if(save_diff)
-            *save_diff = std::chrono::duration_cast<std::chrono::microseconds>(diff).count();
-        std::cout << "Time in microsec: " << std::chrono::duration_cast<std::chrono::microseconds>(diff).count() << std::endl;
-    }
-private:
-    double* save_diff = nullptr;
-    std::chrono::system_clock::time_point start;
-    std::chrono::system_clock::time_point stop;
-};
-
 void fillBuffer(cv::Mat& disparcityMap, cv::Mat& points, cv::Mat& colors)
 {
-    TimeMeasure time;
+    // TimeMeasure time;
 
     double disparcityMapMin;
     minMaxLoc(disparcityMap, &disparcityMapMin);
     cout << "min map: " <<disparcityMapMin << endl;
 
-    std::vector <DataFromReconstruct>& current_buffer = point_buffer[opengl_current_bufer == 0 ? 1: 0];
-    current_buffer.clear();
-    Mat mask = disparcityMap > disparcityMapMin;
-    current_buffer.reserve(static_cast<size_t>(cv::sum(mask)[0]));
+    uint8_t buffer_index = opengl_current_bufer == 0 ? 1: 0;
 
-    switch(disparcityMap.type())
-    {
-        case 0:
-        {
-            for (int y = 0; y < disparcityMap.rows; y++)
-                for (int x = 0; x < disparcityMap.cols; x++)
-                    if(disparcityMap.at<uint8_t>(y, x) > disparcityMapMin)
-                    {
-                        Vec3f vec = points.at <Vec3f> (y, x);
-                        Vec3b col = colors.at <Vec3b> (y, x);
-                        current_buffer.push_back({vec, col[0]});
-                    }
-        }break;
-        case 1:
-        {
-            for (int y = 0; y < disparcityMap.rows; y++)
-                for (int x = 0; x < disparcityMap.cols; x++)
-                    if(disparcityMap.at<int8_t>(y, x) > disparcityMapMin)
-                    {
-                        Vec3f vec = points.at <Vec3f> (y, x);
-                        Vec3b col = colors.at <Vec3b> (y, x);
-                        current_buffer.push_back({vec, col[0]});
-                    }
-        }break;
-        case 2:
-        {
-            for (int y = 0; y < disparcityMap.rows; y++)
-                for (int x = 0; x < disparcityMap.cols; x++)
-                    if(disparcityMap.at<uint16_t>(y, x) > disparcityMapMin)
-                    {
-                        Vec3f vec = points.at <Vec3f> (y, x);
-                        Vec3b col = colors.at <Vec3b> (y, x);
-                        current_buffer.push_back({vec, col[0]});
-                    }
-        }break;
-        case 3:
-        {
-            for (int y = 0; y < disparcityMap.rows; y++)
-                for (int x = 0; x < disparcityMap.cols; x++)
-                    if(disparcityMap.at<int16_t>(y, x) > disparcityMapMin)
-                    {
-                        Vec3f vec = points.at <Vec3f> (y, x);
-                        Vec3b col = colors.at <Vec3b> (y, x);
-                        current_buffer.push_back({vec, col[0]});
-                    }
-        }break;
-        case 4:
-        {
-            for (int y = 0; y < disparcityMap.rows; y++)
-                for (int x = 0; x < disparcityMap.cols; x++)
-                    if(disparcityMap.at<int32_t>(y, x) > disparcityMapMin)
-                    {
-                        Vec3f vec = points.at <Vec3f> (y, x);
-                        Vec3b col = colors.at <Vec3b> (y, x);
-                        current_buffer.push_back({vec, col[0]});
-                    }
-        }break;
-        case 5:
-        {
-            for (int y = 0; y < disparcityMap.rows; y++)
-                for (int x = 0; x < disparcityMap.cols; x++)
-                    if(disparcityMap.at<float>(y, x) > disparcityMapMin)
-                    {
-                        Vec3f vec = points.at <Vec3f> (y, x);
-                        uint8_t col = colors.at <uint8_t> (y, x);
-                        current_buffer.push_back({vec, col});
-                    }
-        }break;
-        case 6:
-        {
-            for (int y = 0; y < disparcityMap.rows; y++)
-                for (int x = 0; x < disparcityMap.cols; x++)
-                    if(disparcityMap.at<double>(y, x) > disparcityMapMin)
-                    {
-                        Vec3f vec = points.at <Vec3f> (y, x);
-                        Vec3b col = colors.at <Vec3b> (y, x);
-                        current_buffer.push_back({vec, col[0]});
-                    }
-        }break;
-        default:
-        {
-            cerr << "Incorrect disparcity map" << endl;
-            return;
-        };
-    }
-    opengl_current_bufer = opengl_current_bufer == 0 ? 1: 0;
+    Mat mask = disparcityMap > disparcityMapMin;
+    uint32_t NumberOfPoints = cv::sum(mask)[0];
+    // current_buffer.reserve(static_cast<size_t>(NumberOfPoints));
+
+    vertex_point_buffer[buffer_index].clear();
+    vertex_point_buffer[buffer_index].reserve(static_cast<size_t>(NumberOfPoints));
+
+    color_point_buffer[buffer_index].clear();
+    color_point_buffer[buffer_index].reserve(static_cast<size_t>(NumberOfPoints));
+
+    for (int y = 0; y < disparcityMap.rows; y++)
+        for (int x = 0; x < disparcityMap.cols; x++)
+            if(disparcityMap.at<float>(y, x) > disparcityMapMin)
+            {
+                Vector3f& vec = points.at <Vector3f> (y, x);
+                uint8_t& col = colors.at <uint8_t> (y, x);
+                vertex_point_buffer[buffer_index].push_back(vec);
+                color_point_buffer[buffer_index].push_back(col);
+                // current_buffer.push_back({vec, col});
+            }
+    opengl_current_bufer = buffer_index;
 }
 
 void opengl_init(int argc, char** argv)
@@ -502,6 +446,7 @@ void opengl_init(int argc, char** argv)
     // create the window
     sf::Window window(sf::VideoMode(800, 600), "OpenGL", sf::Style::Default, sf::ContextSettings(32));
     window.setVerticalSyncEnabled(true);
+    glewInit();
 
     // activate the window
     window.setActive(true);
@@ -522,7 +467,6 @@ void opengl_init(int argc, char** argv)
     gluPerspective(60.f, 1.f, 01.f, 100.0f);//fov, aspect, zNear, zFar
     // glOrtho(-1, 1, -1, 1, -100, 100);
     sf::Shader shader;
-    glewInit();
 
     if (!shader.loadFromFile("../vertex_shader.vert", "../fragment_shader.frag"))
     {
@@ -579,6 +523,11 @@ void opengl_init(int argc, char** argv)
                     y0 = sf::Mouse::getPosition().y;
                     q0 = cam.getRotation();
                 }
+            } break;
+            case sf::Event::MouseWheelMoved:
+            {
+                float delta = event.mouseWheel.delta;
+                cam.ScaleCam(Eigen::Vector3f(delta, delta, delta));
             } break;
             default:
                 break;
@@ -749,7 +698,7 @@ int main(int argc, char** argv)
                 openglExit = true;
                 break;
             }
-            if(k == 'w')
+            if(k == 'p')
             {
                 wait = false;
                 destroyAllWindows();
