@@ -11,6 +11,7 @@
 #include <opencv2/videoio.hpp>
 #include <opencv2/highgui.hpp>
 #include <opencv2/imgproc.hpp>
+
 #include "opencv-helper.hpp"
 
 #include <GL/glew.h>
@@ -91,8 +92,10 @@ class Camera
         scoped_lock guard(mtx);
         rotation = rot * rotation;
     }
-    void setCamRotation(Quaternionf rot)
+    void setCamRotation(Quaternionf& rot)
     {
+        if(rot.coeffs().hasNaN())
+            return;
         scoped_lock guard(mtx);
         rotation = rot;
     }
@@ -110,6 +113,26 @@ class Camera
         CamMatrix.translate(translation);
 
         return CamMatrix.matrix();
+    }
+    void printCameraParam(ostream& out)
+    {
+        out << translation.transpose() << "\r\n";
+        out << rotation << "\r\n";
+    }
+    static Eigen::Matrix4f projective_matrix(float fovY, float aspectRatio, float zNear, float zFar)
+    {
+        float yScale = 1 / tan(fovY * M_PI / 360.0f);
+        float xScale = yScale / aspectRatio;
+
+        // float yScale = 1;
+        // float xScale = 1;
+
+        Eigen::Matrix4f pmat;
+        pmat << xScale, 0, 0, 0,
+                0, yScale, 0, 0,
+                0, 0, -(zFar+zNear)/(zFar-zNear), -2*zNear*zFar/(zFar-zNear),
+                0, 0, -1, 0;
+        return pmat;
     }
     private:
     Vector3f translation{0, 0, 1};
@@ -284,42 +307,14 @@ static void fullDP_CB( int val, void* )
     updateImage();
 }
 
-Eigen::Matrix4f projective_matrix(float fovY, float aspectRatio, float zNear, float zFar)
-{
-    float yScale = 1 / tan(fovY * M_PI / 360.0f);
-    float xScale = yScale / aspectRatio;
-
-    // float yScale = 1;
-    // float xScale = 1;
-
-    Eigen::Matrix4f pmat;
-    pmat << xScale, 0, 0, 0,
-            0, yScale, 0, 0,
-            0, 0, -(zFar+zNear)/(zFar-zNear), -2*zNear*zFar/(zFar-zNear),
-            0, 0, -1, 0;
-    return pmat;
-}
-
-void drawImage3D(Vector3f& translation, AngleAxisf& rotation, Vector3f& scale, sf::Shader& shader)
+void drawImage3D(sf::Shader& shader)
 {
     glLoadIdentity();
 
-    // glScalef(scale.x(), scale.y(), scale.z());
-    // glRotatef(rotation.angle() * 180 / M_PI, rotation.axis().x(), rotation.axis().y(), rotation.axis().z());
-    // glTranslatef(translation.x(), translation.y(), translation.z());
+    static const Matrix4f projective_matrix_ = Camera::projective_matrix(60.f, 1.f, 01.f, 100.0f);
+    Eigen::Matrix4f mvp = projective_matrix_ * cam.getCameraMatrix();
 
-    /*
-    Model_View.setToIdentity();
-    Model_View.translate(position);
-    Model_View.rotate(orenation);
-    Model_View.scale(scale);
-
-    QMatrix4x4 test=Projection*(cam)*Model_View;
-*/
-
-    Eigen::Matrix4f projective = projective_matrix(60.f, 1.f, 01.f, 100.0f) * cam.getCameraMatrix();
-
-    sf::Glsl::Mat4 dsa(projective.data());
+    sf::Glsl::Mat4 dsa(mvp.data());
 
     shader.setUniform("mvp_matrix", dsa);
 
@@ -340,7 +335,7 @@ void drawImage3D(Vector3f& translation, AngleAxisf& rotation, Vector3f& scale, s
     glPointSize(5);
     glDrawArrays(GL_POINTS, 0, vertex_point_buffer[opengl_current_bufer].size());
 
-    // drawCube();
+    drawCube();
 }
 
 void updateImage()
@@ -348,7 +343,7 @@ void updateImage()
     TimeMeasure time;
     stereo->compute(imgU_L, imgU_R, disp);
     disp.convertTo(disp, CV_32F, 1.0f / 16.0f);
-    reprojectImageTo3D(disp, Out3D, Q);
+    reprojectImageTo3D(disp, Out3D, Q, true);
     fillBuffer(disp, Out3D, imgU_L);
 }
 
@@ -356,47 +351,44 @@ void drawCube()
 {
     double vertex[] =
     {
-        -1.f,  1.f, -1.f,   1.0 ,  0.0 , 0.0 ,
-        1.f,  1.f, -1.f,    1.0 ,  0.0 , 0.0 ,
-        -1.f, -1.f, -1.f,   1.0 ,  0.0 , 0.0 ,
-        1.f, -1.f, -1.f,    1.0 ,  0.0 , 0.0 ,
-        -1.f, -1.f,  1.f,   1.0 ,  0.0 , 0.0 ,
-        -1.f,  1.f,  1.f,   1.0 ,  0.0 , 0.0 ,
-        1.f,  1.f,  1.f,    1.0 ,  0.0 , 0.0 ,
-        1.f, -1.f,  1.f,    1.0 ,  0.0 , 0.0 ,
-        -1.f, -1.f, -1.f,   1.0 ,  0.0 , 0.0 ,
-        -1.f,  1.f, -1.f,   1.0 ,  0.0 , 0.0 ,
-        -1.f,  1.f,  1.f,   1.0 ,  0.0 , 0.0 ,
-        -1.f, -1.f,  1.f,   1.0 ,  0.0 , 0.0 ,
-        1.f, -1.f, -1.f,    1.0 ,  0.0 , 0.0 ,
-        1.f,  1.f, -1.f,    1.0 ,  0.0 , 0.0 ,
-        1.f,  1.f,  1.f,    1.0 ,  0.0 , 0.0 ,
-        1.f, -1.f,  1.f,    1.0 ,  0.0 , 0.0 ,
-        -1.f, -1.f,  1.f,   1.0 ,  0.0 , 0.0 ,
-        -1.f, -1.f, -1.f,   1.0 ,  0.0 , 0.0 ,
-        1.f, -1.f, -1.f,    1.0 ,  0.0 , 0.0 ,
-        1.f, -1.f,  1.f,    1.0 ,  0.0 , 0.0 ,
-        -1.f,  1.f,  1.f,   1.0 ,  0.0 , 0.0 ,
-        -1.f,  1.f, -1.f,   1.0 ,  0.0 , 0.0 ,
-        1.f,  1.f, -1.f,    1.0 ,  0.0 , 0.0 ,
-        1.f,  1.f,  1.f    ,1.0 ,  0.0 , 0.0 ,
+        -1.f,  1.f, -1.f,   255.0,
+        1.f,  1.f, -1.f,    255.0,
+        -1.f, -1.f, -1.f,   255.0,
+        1.f, -1.f, -1.f,    255.0,
+        -1.f, -1.f,  1.f,   255.0,
+        -1.f,  1.f,  1.f,   255.0,
+        1.f,  1.f,  1.f,    255.0,
+        1.f, -1.f,  1.f,    255.0,
+        -1.f, -1.f, -1.f,   255.0,
+        -1.f,  1.f, -1.f,   255.0,
+        -1.f,  1.f,  1.f,   255.0,
+        -1.f, -1.f,  1.f,   255.0,
+        1.f, -1.f, -1.f,    255.0,
+        1.f,  1.f, -1.f,    255.0,
+        1.f,  1.f,  1.f,    255.0,
+        1.f, -1.f,  1.f,    255.0,
+        -1.f, -1.f,  1.f,   255.0,
+        -1.f, -1.f, -1.f,   255.0,
+        1.f, -1.f, -1.f,    255.0,
+        1.f, -1.f,  1.f,    255.0,
+        -1.f,  1.f,  1.f,   255.0,
+        -1.f,  1.f, -1.f,   255.0,
+        1.f,  1.f, -1.f,    255.0,
+        1.f,  1.f,  1.f    ,255.0,
 
       };
 
-    glVertexPointer(3, GL_DOUBLE, sizeof(vertex[0]) * 6, vertex);
-    glEnableClientState(GL_VERTEX_ARRAY);
+    glVertexAttribPointer(0, 3, GL_DOUBLE, GL_FALSE, sizeof(vertex[0]) * 4, vertex);
+    glEnableVertexAttribArray(0);
 
-    glColorPointer(3, GL_DOUBLE, sizeof(vertex[0]) * 6, &vertex[3]);
-    glEnableClientState(GL_COLOR_ARRAY);
+    glVertexAttribPointer(1, 1, GL_DOUBLE, GL_FALSE, sizeof(vertex[0]) * 4, vertex+3);
+    glEnableVertexAttribArray(1);
 
     glDrawArrays(GL_QUADS, 0, 24);
 }
 
 void display(sf::Clock& Clock, sf::Shader& shader )
 {
-    Vector3f translation = cam.getTranslation();
-    AngleAxisf rotation  = AngleAxisf(cam.getRotation());
-    Vector3f   scale     = cam.getScale();
 
     // glTranslatef(translation.x(), translation.y(), translation.z());
     // glRotatef(rotation.angle(), rotation.axis().x(), rotation.axis().y(), rotation.axis().z());
@@ -405,7 +397,7 @@ void display(sf::Clock& Clock, sf::Shader& shader )
     glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
     glMatrixMode(GL_MODELVIEW);
-    drawImage3D(translation, rotation, scale, shader);
+    drawImage3D(shader);
 }
 
 void fillBuffer(cv::Mat& disparcityMap, cv::Mat& points, cv::Mat& colors)
@@ -526,8 +518,9 @@ void opengl_init(int argc, char** argv)
             } break;
             case sf::Event::MouseWheelMoved:
             {
-                float delta = event.mouseWheel.delta;
+                float delta = event.mouseWheel.delta * 0.1;
                 cam.ScaleCam(Eigen::Vector3f(delta, delta, delta));
+                cam.printCameraParam(cout);
             } break;
             default:
                 break;
@@ -643,8 +636,8 @@ int main(int argc, char** argv)
 
     // Creating trackbars to dynamically update the StereoBM parameters
     createTrackbar("minDisparity",      "trackbar", &minDisparity        , 15  , minDisparity_CB);
-    createTrackbar("numDisparities",    "trackbar", &numDisparities      , 1000, numDisparities_CB);
-    createTrackbar("window_size",       "trackbar",   &window_size       , 1000, windows_size_CB);
+    createTrackbar("numDisparities",    "trackbar", &numDisparities      , 250, numDisparities_CB);
+    createTrackbar("window_size",       "trackbar",   &window_size       , 20, windows_size_CB);
     createTrackbar("block_size",        "trackbar",   &block_size       , 100, block_size_CB);
     createTrackbar("disp12MaxDiff",     "trackbar", &disp12MaxDiff       , 1000, disp12MaxDiff_CB);
     createTrackbar("preFilterCap",      "trackbar", &preFilterCap        , 1000, preFilterCap_CB);
@@ -658,8 +651,8 @@ int main(int argc, char** argv)
     bool wait = true;
     for(auto file : files)
     {
-        Mat img = imread(file);
-        cvtColor(img, img_gray, COLOR_BGR2GRAY);
+        Mat img_gray = imread(file, IMREAD_GRAYSCALE);
+        // cvtColor(img, img_gray, COLOR_BGR2GRAY);
 
         int startX_L =    0, startY_L = 0, width_L = 1280, height_L = 800;
         int startX_R = 1280, startY_R = 0, width_R = 1280, height_R = 800;
