@@ -122,65 +122,9 @@ end_header\n";
     double disparcityMapMin;
     minMaxLoc(disparcityMap, &disparcityMapMin);
     cout << "min map: " <<disparcityMapMin << endl;
-    uint32_t VertexCnt = 0;
 
-    switch(disparcityMap.type())
-    {
-    	case 0:
-    	{
-			for (int y = 0; y < disparcityMap.rows; y++)
-				for (int x = 0; x < disparcityMap.cols; x++)
-					if(disparcityMap.at<uint8_t>(y, x) > disparcityMapMin)
-						VertexCnt++;
-    	}break;
-    	case 1:
-    	{
-			for (int y = 0; y < disparcityMap.rows; y++)
-				for (int x = 0; x < disparcityMap.cols; x++)
-					if(disparcityMap.at<int8_t>(y, x) > disparcityMapMin)
-						VertexCnt++;
-    	}break;
-    	case 2:
-    	{
-			for (int y = 0; y < disparcityMap.rows; y++)
-				for (int x = 0; x < disparcityMap.cols; x++)
-					if(disparcityMap.at<uint16_t>(y, x) > disparcityMapMin)
-						VertexCnt++;
-    	}break;
-    	case 3:
-    	{
-			for (int y = 0; y < disparcityMap.rows; y++)
-				for (int x = 0; x < disparcityMap.cols; x++)
-					if(disparcityMap.at<int16_t>(y, x) > disparcityMapMin)
-						VertexCnt++;
-    	}break;
-    	case 4:
-    	{
-			for (int y = 0; y < disparcityMap.rows; y++)
-				for (int x = 0; x < disparcityMap.cols; x++)
-					if(disparcityMap.at<int32_t>(y, x) > disparcityMapMin)
-						VertexCnt++;
-    	}break;
-    	case 5:
-    	{
-			for (int y = 0; y < disparcityMap.rows; y++)
-				for (int x = 0; x < disparcityMap.cols; x++)
-					if(disparcityMap.at<float>(y, x) > disparcityMapMin)
-						VertexCnt++;
-    	}break;
-    	case 6:
-    	{
-			for (int y = 0; y < disparcityMap.rows; y++)
-				for (int x = 0; x < disparcityMap.cols; x++)
-					if(disparcityMap.at<double>(y, x) > disparcityMapMin)
-						VertexCnt++;
-    	}break;
-    	default:
-    	{
-    		cerr << "Incorrect disparcity map" << endl;
-    		return;
-    	};
-    }
+    Mat mask = disparcityMap > disparcityMapMin;
+    uint32_t VertexCnt = cv::sum(mask)[0];
 
     fprintf(out_ply, format, VertexCnt);
 

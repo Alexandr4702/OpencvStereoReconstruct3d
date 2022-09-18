@@ -403,7 +403,7 @@ void display(sf::Clock& Clock, sf::Shader& shader )
 
 void fillBuffer(cv::Mat& disparcityMap, cv::Mat& points, cv::Mat& colors)
 {
-    // TimeMeasure time;
+    TimeMeasure time;
 
     double disparcityMapMin;
     minMaxLoc(disparcityMap, &disparcityMapMin);
@@ -422,13 +422,12 @@ void fillBuffer(cv::Mat& disparcityMap, cv::Mat& points, cv::Mat& colors)
 
     for (int y = 0; y < disparcityMap.rows; y++)
         for (int x = 0; x < disparcityMap.cols; x++)
-            if(disparcityMap.at<float>(y, x) > disparcityMapMin)
+            if(mask.at<uint8_t>(y, x))
             {
                 Vector3f& vec = points.at <Vector3f> (y, x);
                 uint8_t& col = colors.at <uint8_t> (y, x);
                 vertex_point_buffer[buffer_index].push_back(vec);
                 color_point_buffer[buffer_index].push_back(col);
-                // current_buffer.push_back({vec, col});
             }
     opengl_current_bufer = buffer_index;
 }
