@@ -398,7 +398,6 @@ void display(sf::Clock& Clock, sf::Shader& shader )
 
     glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
-    glMatrixMode(GL_MODELVIEW);
     drawImage3D(shader);
 }
 
@@ -414,7 +413,6 @@ void fillBuffer(cv::Mat& disparcityMap, cv::Mat& points, cv::Mat& colors)
 
     Mat mask = disparcityMap > disparcityMapMin;
     uint32_t NumberOfPoints = cv::sum(mask)[0];
-    // current_buffer.reserve(static_cast<size_t>(NumberOfPoints));
 
     vertex_point_buffer[buffer_index].clear();
     vertex_point_buffer[buffer_index].reserve(static_cast<size_t>(NumberOfPoints));

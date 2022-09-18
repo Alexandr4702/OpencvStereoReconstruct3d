@@ -19,6 +19,7 @@ target_link_libraries( calibrate3D ${OpenCV_LIBS} -lpthread -lstdc++fs)
 
 add_executable(reconstruct stereoReconstruct.cpp)
 target_link_libraries( reconstruct ${OpenCV_LIBS} ${OPENGL_LIBRARIES} ${GLEW_LIBRARIES} -lGL -lGLU ${GLUT_LIBRARY} -lsfml-graphics -lsfml-window -lsfml-system -lpthread -lstdc++fs)
+# -lopencv_cudaimgproc
 
 # add_executable(captureImageRpi captureImageRpi.cpp)
 # target_link_libraries( captureImageRpi ${OpenCV_LIBS} -larducam_mipicamera -lpthread -lstdc++fs)
