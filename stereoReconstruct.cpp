@@ -58,158 +58,23 @@ float color1;
 float color2;
 };
 
-class Camera
-{
-    public:
-    Vector3f getTranslation()
-    {
-        mtx.lock();
-        Vector3f ret = translation;
-        mtx.unlock();
-        return ret;
-    }
-    Quaternionf getRotation()
-    {
-        mtx.lock();
-        Quaternionf ret = rotation;
-        mtx.unlock();
-        return ret;
-    }
-    Vector3f getScale()
-    {
-        mtx.lock();
-        Vector3f ret = scale;
-        mtx.unlock();
-        return ret;
-    }
-    void TranslateCam(Vector3f transl)
-    {
-        scoped_lock guard(mtx);
-        translation += rotation.inverse() * transl;
-    }
-    void rotateCam(Quaternionf rot)
-    {
-        scoped_lock guard(mtx);
-        rotation = rot * rotation;
-    }
-    void setCamRotation(Quaternionf& rot)
-    {
-        if(rot.coeffs().hasNaN())
-            return;
-        scoped_lock guard(mtx);
-        rotation = rot;
-    }
-    void ScaleCam(Vector3f scal)
-    {
-        scoped_lock guard(mtx);
-        scale += scal;
-    }
-    Eigen::Matrix4f getCameraMatrix()
-    {
-        Eigen::Affine3f CamMatrix;
-        CamMatrix.setIdentity();
-        CamMatrix.scale(scale);
-        CamMatrix.rotate(rotation);
-        CamMatrix.translate(translation);
-
-        return CamMatrix.matrix();
-    }
-    void printCameraParam(ostream& out)
-    {
-        out << translation.transpose() << "\r\n";
-        out << rotation << "\r\n";
-    }
-    static Eigen::Matrix4f projective_matrix(float fovY, float aspectRatio, float zNear, float zFar)
-    {
-        float yScale = 1 / tan(fovY * M_PI / 360.0f);
-        float xScale = yScale / aspectRatio;
-
-        // float yScale = 1;
-        // float xScale = 1;
-
-        Eigen::Matrix4f pmat;
-        pmat << xScale, 0, 0, 0,
-                0, yScale, 0, 0,
-                0, 0, -(zFar+zNear)/(zFar-zNear), -2*zNear*zFar/(zFar-zNear),
-                0, 0, -1, 0;
-        return pmat;
-    }
-    private:
-    Vector3f translation{0, 0, 1};
-    Quaternionf rotation = Quaternionf(0, 0, 1, 0);
-    Vector3f       scale {1.0f, 1.0f, 1.0f};
-    std::mutex mtx;
-};
-
-class TimeMeasure
-{
-public:
-    TimeMeasure()
-    {
-        start = std::chrono::system_clock::now();
-    }
-    TimeMeasure(double* save)
-    {
-        save_diff = save;
-        start = std::chrono::system_clock::now();
-    }
-    ~TimeMeasure()
-    {
-        stop = std::chrono::system_clock::now();
-        auto diff = stop - start;
-        if(save_diff)
-            *save_diff = std::chrono::duration_cast<std::chrono::microseconds>(diff).count();
-        std::cout << "Time in microsec: " << std::chrono::duration_cast<std::chrono::microseconds>(diff).count() << std::endl;
-    }
-private:
-    double* save_diff = nullptr;
-    std::chrono::system_clock::time_point start;
-    std::chrono::system_clock::time_point stop;
-};
-
 Camera cam;
-
-int window_size = 5;
-
-int minDisparity = 6;
-int numDisparities = 80;
-int block_size = 4; // 3 to 11 is recommended
-int P1=8 * 3 * window_size * window_size;
-int P2=32 * 3 * window_size * window_size;
-int disp12MaxDiff=1;
-int preFilterCap=1;
-int uniquenessRatio=53;
-int speckleWindowSize=1;
-int speckleRange=1;
-int StereoMode = StereoSGBM::MODE_SGBM;
 
 bool openglExit = false;
 bool mainThreadExit = false;
 
-// Creating an object of StereoSGBM algorithm
-cv::Ptr<cv::StereoSGBM> stereo = cv::StereoSGBM::create(
-    minDisparity,
+int numDisparities = 80;
+int block_size = 4;
+
+cv::Ptr<cv::StereoBM> stereoBMobject = cv::StereoBM::create(
     numDisparities,
-    block_size,
-    P1,
-    P2,
-    disp12MaxDiff,
-    preFilterCap,
-    uniquenessRatio,
-    speckleWindowSize,
-    speckleRange,
-    StereoMode
-    );
+    block_size
+);
 
 Mat disp, disparity;
 Mat imgU_L, imgU_R;
 Mat Out3D;
 Mat  Q;
-
-std::vector <DataFromReconstruct> point_buffer[2] = {
-    {},
-    {}
-};
 
 std::vector <Vector3f> vertex_point_buffer[2] = {
     {}
@@ -222,90 +87,6 @@ std::vector <uint8_t> color_point_buffer[2] = {
 uint8_t opengl_current_bufer = 0;
 bool opengl_request_change_buffer = false;
 bool nextImage = false;
-
-
-static void minDisparity_CB( int val, void* )
-{
-    minDisparity = val + 1;
-    stereo->setMinDisparity(minDisparity);
-
-    updateImage();
-}
-
-static void numDisparities_CB( int val, void* )
-{
-    numDisparities = val + 1;
-    stereo->setNumDisparities(numDisparities);
-
-    updateImage();
-}
-
-static void block_size_CB( int val, void* )
-{
-    block_size = val;
-    stereo->setBlockSize(block_size);
-
-    updateImage();
-}
-
-static void windows_size_CB( int val, void* )
-{
-    window_size = val;
-    P1 =  8 * 3 * window_size * window_size;
-    P2 = 32 * 3 * window_size * window_size;
-    stereo->setP1(P1);
-    stereo->setP2(P2);
-
-    updateImage();
-}
-
-static void disp12MaxDiff_CB( int val, void* )
-{
-    disp12MaxDiff = val;
-    stereo->setDisp12MaxDiff(disp12MaxDiff);
-
-    updateImage();
-}
-
-static void preFilterCap_CB( int val, void* )
-{
-    preFilterCap = val;
-    stereo->setPreFilterCap(preFilterCap);
-
-    updateImage();
-}
-
-static void uniquenessRatio_CB( int val, void* )
-{
-    uniquenessRatio = val;
-    stereo->setUniquenessRatio(uniquenessRatio);
-
-    updateImage();
-}
-
-static void speckleWindowSize_CB( int val, void* )
-{
-    speckleWindowSize = val;
-    stereo->setSpeckleWindowSize(speckleWindowSize);
-
-    updateImage();
-}
-
-static void speckleRange_CB( int val, void* )
-{
-    speckleRange = val;
-    stereo->setSpeckleRange(speckleRange);
-
-    updateImage();
-}
-
-static void fullDP_CB( int val, void* )
-{
-    StereoMode = val;
-    stereo->setMode(StereoMode);
-
-    updateImage();
-}
 
 void drawImage3D(sf::Shader& shader)
 {
@@ -335,18 +116,7 @@ void drawImage3D(sf::Shader& shader)
     glPointSize(5);
     glDrawArrays(GL_POINTS, 0, vertex_point_buffer[opengl_current_bufer].size());
 
-    drawCube();
-}
-
-void updateImage()
-{
-    if(imgU_L.data == nullptr)
-        return;
-    TimeMeasure time;
-    stereo->compute(imgU_L, imgU_R, disp);
-    disp.convertTo(disp, CV_32F, 1.0f / 16.0f);
-    reprojectImageTo3D(disp, Out3D, Q, true);
-    fillBuffer(disp, Out3D, imgU_L);
+    // drawCube();
 }
 
 void drawCube()
@@ -391,45 +161,9 @@ void drawCube()
 
 void display(sf::Clock& Clock, sf::Shader& shader )
 {
-
-    // glTranslatef(translation.x(), translation.y(), translation.z());
-    // glRotatef(rotation.angle(), rotation.axis().x(), rotation.axis().y(), rotation.axis().z());
-    // glScalef(scale.x(), scale.y(), scale.z());
-
     glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
     drawImage3D(shader);
-}
-
-void fillBuffer(cv::Mat& disparcityMap, cv::Mat& points, cv::Mat& colors)
-{
-    TimeMeasure time;
-
-    double disparcityMapMin;
-    minMaxLoc(disparcityMap, &disparcityMapMin);
-    cout << "min map: " <<disparcityMapMin << endl;
-
-    uint8_t buffer_index = opengl_current_bufer == 0 ? 1: 0;
-
-    Mat mask = disparcityMap > disparcityMapMin;
-    uint32_t NumberOfPoints = cv::sum(mask)[0];
-
-    vertex_point_buffer[buffer_index].clear();
-    vertex_point_buffer[buffer_index].reserve(static_cast<size_t>(NumberOfPoints));
-
-    color_point_buffer[buffer_index].clear();
-    color_point_buffer[buffer_index].reserve(static_cast<size_t>(NumberOfPoints));
-
-    for (int y = 0; y < disparcityMap.rows; y++)
-        for (int x = 0; x < disparcityMap.cols; x++)
-            if(mask.at<uint8_t>(y, x))
-            {
-                Vector3f& vec = points.at <Vector3f> (y, x);
-                uint8_t& col = colors.at <uint8_t> (y, x);
-                vertex_point_buffer[buffer_index].push_back(vec);
-                color_point_buffer[buffer_index].push_back(col);
-            }
-    opengl_current_bufer = buffer_index;
 }
 
 void opengl_init(int argc, char** argv)
@@ -616,31 +350,14 @@ int main(int argc, char** argv)
 
     cout << "Undistort complete\n";
 
-    // Creating a named window to be linked to the trackbars
-    namedWindow("trackbar",cv::WINDOW_NORMAL);
+    StereoSGBMSetteings stereoSGBMobject;
 
-    // Creating trackbars to dynamically update the StereoBM parameters
-    createTrackbar("minDisparity",      "trackbar", nullptr , 15  , minDisparity_CB);
-    createTrackbar("numDisparities",    "trackbar", nullptr , 250, numDisparities_CB);
-    createTrackbar("window_size",       "trackbar", nullptr , 20, windows_size_CB);
-    createTrackbar("block_size",        "trackbar", nullptr , 100, block_size_CB);
-    createTrackbar("disp12MaxDiff",     "trackbar", nullptr , 1000, disp12MaxDiff_CB);
-    createTrackbar("preFilterCap",      "trackbar", nullptr , 1000, preFilterCap_CB);
-    createTrackbar("uniquenessRatio",   "trackbar", nullptr , 1000, uniquenessRatio_CB);
-    createTrackbar("speckleWindowSize", "trackbar", nullptr , 1000, speckleWindowSize_CB);
-    createTrackbar("speckleRange",      "trackbar", nullptr , 1000, speckleRange_CB);
-    createTrackbar("fullDP",            "trackbar", nullptr ,    4, fullDP_CB);
-
-    setTrackbarPos("minDisparity",      "trackbar", minDisparity      );
-    setTrackbarPos("numDisparities",    "trackbar", numDisparities    );
-    setTrackbarPos("window_size",       "trackbar", window_size       );
-    setTrackbarPos("block_size",        "trackbar", block_size        );
-    setTrackbarPos("disp12MaxDiff",     "trackbar", disp12MaxDiff     );
-    setTrackbarPos("preFilterCap",      "trackbar", preFilterCap      );
-    setTrackbarPos("uniquenessRatio",   "trackbar", uniquenessRatio   );
-    setTrackbarPos("speckleWindowSize", "trackbar", speckleWindowSize );
-    setTrackbarPos("speckleRange",      "trackbar", speckleRange      );
-    setTrackbarPos("fullDP",            "trackbar", StereoMode        );
+    stereoSGBMobject.init(Q);
+    stereoSGBMobject.user_callback = [&](){
+        uint8_t buffer_index = opengl_current_bufer == 0 ? 1: 0;
+        stereoSGBMobject.fillBuffer(vertex_point_buffer[buffer_index], color_point_buffer[buffer_index]);
+        opengl_current_bufer = buffer_index;
+    };
 
     thread opengl(opengl_init, argc, argv);
 
@@ -648,7 +365,6 @@ int main(int argc, char** argv)
     for(auto file : files)
     {
         Mat img_gray = imread(file, IMREAD_GRAYSCALE);
-        // cvtColor(img, img_gray, COLOR_BGR2GRAY);
 
         int startX_L =    0, startY_L = 0, width_L = 1280, height_L = 800;
         int startX_R = 1280, startY_R = 0, width_R = 1280, height_R = 800;
@@ -656,10 +372,10 @@ int main(int argc, char** argv)
         Mat ROI_L(img_gray, Rect(startX_L, startY_L, width_L, height_L));
         Mat ROI_R(img_gray, Rect(startX_R, startY_R, width_R, height_R));
 
-        remap(ROI_L, imgU_L, mapX_L, mapY_L, INTER_LINEAR, BORDER_CONSTANT, Scalar());
-        remap(ROI_R, imgU_R, mapX_R, mapY_R, INTER_LINEAR, BORDER_CONSTANT, Scalar());
+        remap(ROI_L, stereoSGBMobject.imgU_L, mapX_L, mapY_L, INTER_LINEAR, BORDER_CONSTANT, Scalar());
+        remap(ROI_R, stereoSGBMobject.imgU_R, mapX_R, mapY_R, INTER_LINEAR, BORDER_CONSTANT, Scalar());
 
-        updateImage();
+        stereoSGBMobject.update_data();
 
         // string filename_stem = std::filesystem::path(file).stem() ;
         // write_ply(path + "/ply/" + filename_stem + ".ply", disp, Out3D, imgU_L);
