@@ -442,11 +442,8 @@ void opengl_init(int argc, char** argv)
     window.setVerticalSyncEnabled(true);
     glewInit();
 
-    // activate the window
     window.setActive(true);
 
-    // load resources, initialize the OpenGL states, ...
-    // Create a clock for measuring time elapsed
     sf::Clock Clock;
 
     //prepare OpenGL surface for HSR
@@ -455,11 +452,6 @@ void opengl_init(int argc, char** argv)
     glEnable(GL_DEPTH_TEST);
     glDepthMask(GL_TRUE);
 
-    //// Setup a perspective projection & Camera position
-    glMatrixMode(GL_PROJECTION);
-    glLoadIdentity();
-    gluPerspective(60.f, 1.f, 01.f, 100.0f);//fov, aspect, zNear, zFar
-    // glOrtho(-1, 1, -1, 1, -100, 100);
     sf::Shader shader;
 
     if (!shader.loadFromFile("../vertex_shader.vert", "../fragment_shader.frag"))
@@ -467,12 +459,6 @@ void opengl_init(int argc, char** argv)
         cout << "Can't load vertex shader\r\n";
         return;
     }
-
-    // if (!shader.loadFromFile("../fragment_shader.frag", sf::Shader::Fragment))
-    // {
-    //     cout << "Can't load fragment shader\r\n";
-    //     return;
-    // }
 
     float x0 = 0,y0 = 0;
     Quaternionf q0 = cam.getRotation();
