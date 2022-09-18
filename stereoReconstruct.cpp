@@ -340,6 +340,8 @@ void drawImage3D(sf::Shader& shader)
 
 void updateImage()
 {
+    if(imgU_L.data == nullptr)
+        return;
     TimeMeasure time;
     stereo->compute(imgU_L, imgU_R, disp);
     disp.convertTo(disp, CV_32F, 1.0f / 16.0f);
@@ -635,16 +637,27 @@ int main(int argc, char** argv)
     namedWindow("trackbar",cv::WINDOW_NORMAL);
 
     // Creating trackbars to dynamically update the StereoBM parameters
-    createTrackbar("minDisparity",      "trackbar", &minDisparity        , 15  , minDisparity_CB);
-    createTrackbar("numDisparities",    "trackbar", &numDisparities      , 250, numDisparities_CB);
-    createTrackbar("window_size",       "trackbar",   &window_size       , 20, windows_size_CB);
-    createTrackbar("block_size",        "trackbar",   &block_size       , 100, block_size_CB);
-    createTrackbar("disp12MaxDiff",     "trackbar", &disp12MaxDiff       , 1000, disp12MaxDiff_CB);
-    createTrackbar("preFilterCap",      "trackbar", &preFilterCap        , 1000, preFilterCap_CB);
-    createTrackbar("uniquenessRatio",   "trackbar", &uniquenessRatio     , 1000, uniquenessRatio_CB);
-    createTrackbar("speckleWindowSize", "trackbar", &speckleWindowSize   , 1000, speckleWindowSize_CB);
-    createTrackbar("speckleRange",      "trackbar", &speckleRange        , 1000, speckleRange_CB);
-    createTrackbar("fullDP",            "trackbar", &StereoMode          ,    4, fullDP_CB);
+    createTrackbar("minDisparity",      "trackbar", nullptr , 15  , minDisparity_CB);
+    createTrackbar("numDisparities",    "trackbar", nullptr , 250, numDisparities_CB);
+    createTrackbar("window_size",       "trackbar", nullptr , 20, windows_size_CB);
+    createTrackbar("block_size",        "trackbar", nullptr , 100, block_size_CB);
+    createTrackbar("disp12MaxDiff",     "trackbar", nullptr , 1000, disp12MaxDiff_CB);
+    createTrackbar("preFilterCap",      "trackbar", nullptr , 1000, preFilterCap_CB);
+    createTrackbar("uniquenessRatio",   "trackbar", nullptr , 1000, uniquenessRatio_CB);
+    createTrackbar("speckleWindowSize", "trackbar", nullptr , 1000, speckleWindowSize_CB);
+    createTrackbar("speckleRange",      "trackbar", nullptr , 1000, speckleRange_CB);
+    createTrackbar("fullDP",            "trackbar", nullptr ,    4, fullDP_CB);
+
+    setTrackbarPos("minDisparity",      "trackbar", minDisparity      );
+    setTrackbarPos("numDisparities",    "trackbar", numDisparities    );
+    setTrackbarPos("window_size",       "trackbar", window_size       );
+    setTrackbarPos("block_size",        "trackbar", block_size        );
+    setTrackbarPos("disp12MaxDiff",     "trackbar", disp12MaxDiff     );
+    setTrackbarPos("preFilterCap",      "trackbar", preFilterCap      );
+    setTrackbarPos("uniquenessRatio",   "trackbar", uniquenessRatio   );
+    setTrackbarPos("speckleWindowSize", "trackbar", speckleWindowSize );
+    setTrackbarPos("speckleRange",      "trackbar", speckleRange      );
+    setTrackbarPos("fullDP",            "trackbar", StereoMode        );
 
     thread opengl(opengl_init, argc, argv);
 
