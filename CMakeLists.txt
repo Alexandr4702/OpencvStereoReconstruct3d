@@ -23,3 +23,6 @@ target_link_libraries( reconstruct ${OpenCV_LIBS} ${OPENGL_LIBRARIES} ${GLEW_LIB
 
 # add_executable(captureImageRpi captureImageRpi.cpp)
 # target_link_libraries( captureImageRpi ${OpenCV_LIBS} -larducam_mipicamera -lpthread -lstdc++fs)
+
+add_executable(captureImage captureImage.cpp)
+target_link_libraries( captureImage ${OpenCV_LIBS} -lpthread -lstdc++fs)

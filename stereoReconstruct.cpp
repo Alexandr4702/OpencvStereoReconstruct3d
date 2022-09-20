@@ -32,31 +32,6 @@ using std::filesystem::directory_iterator;
 
 void drawCube();
 void drawPoint();
-void updateImage();
-void fillBuffer(cv::Mat& disparcityMap, cv::Mat& points, cv::Mat& colors);
-
-class DataFromReconstruct
-{
-public:
-DataFromReconstruct(Vec3f& pos, uint8_t color):color0(color / 255.0f)
-{
-    x = pos[0];
-    y = pos[1];
-    z = pos[2];
-}
-DataFromReconstruct(Vector3f& pos, uint8_t color):color0(color / 255.0f)
-{
-    x = pos[0];
-    y = pos[1];
-    z = pos[2];
-}
-float x;
-float y;
-float z;
-float color0;
-float color1;
-float color2;
-};
 
 Camera cam;
 

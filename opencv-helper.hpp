@@ -315,6 +315,215 @@ private:
     std::chrono::system_clock::time_point stop;
 };
 
+// class StereoBMSetteings
+// {
+//     public:
+//     int window_size = 5;
+//     int minDisparity = 6;
+//     int numDisparities = 80;
+//     int block_size = 4; // 3 to 11 is recommended
+//     int P1=8 * 3 * window_size * window_size;
+//     int P2=32 * 3 * window_size * window_size;
+//     int disp12MaxDiff=1;
+//     int preFilterCap=1;
+//     int uniquenessRatio=53;
+//     int speckleWindowSize=1;
+//     int speckleRange=1;
+
+//     cv::Mat Out3D, Q, disp;
+//     cv::Mat imgU_L, imgU_R;
+
+//     cv::Ptr<cv::StereoBM> stereoSGBMobject = cv::StereoBM::create(
+//         numDisparities,
+//         block_size,
+//     );
+
+//     std::function<void()> user_callback = [](){};
+
+//     static void minDisparity_CB( int val, void* object_)
+//     {
+//         StereoBMSetteings* object = reinterpret_cast<StereoBMSetteings*> (object_);
+//         object->minDisparity = val + 1;
+//         object->stereoSGBMobject->setMinDisparity(object->minDisparity);
+
+//         object->update_data();
+//     }
+
+//     static void numDisparities_CB( int val, void* object_)
+//     {
+//         StereoBMSetteings* object = reinterpret_cast<StereoBMSetteings*> (object_);
+
+//         object->numDisparities = val + 1;
+//         object->stereoSGBMobject->setNumDisparities(object->numDisparities);
+
+//         object->update_data();
+//     }
+
+//     static void block_size_CB( int val, void* object_)
+//     {
+//         StereoBMSetteings* object = reinterpret_cast<StereoBMSetteings*> (object_);
+
+//         object->block_size = val;
+//         object->stereoSGBMobject->setBlockSize(object->block_size);
+
+//         object->update_data();
+//     }
+
+//     static void windows_size_CB( int val, void* object_)
+//     {
+//         StereoBMSetteings* object = reinterpret_cast<StereoBMSetteings*> (object_);
+
+//         object->window_size = val;
+//         object->P1 =  8 * 3 * object->window_size * object->window_size;
+//         object->P2 = 32 * 3 * object->window_size * object->window_size;
+//         object->stereoSGBMobject->setP1(object->P1);
+//         object->stereoSGBMobject->setP2(object->P2);
+
+//         object->update_data();
+//     }
+
+//     static void disp12MaxDiff_CB( int val, void* object_)
+//     {
+//         StereoBMSetteings* object = reinterpret_cast<StereoBMSetteings*> (object_);
+
+//         object->disp12MaxDiff = val;
+//         object->stereoSGBMobject->setDisp12MaxDiff(object->disp12MaxDiff);
+
+//         object->update_data();
+//     }
+
+//     static void preFilterCap_CB( int val, void* object_)
+//     {
+//         StereoBMSetteings* object = reinterpret_cast<StereoBMSetteings*> (object_);
+
+//         object->preFilterCap = val;
+//         object->stereoSGBMobject->setPreFilterCap(object->preFilterCap);
+
+//         object->update_data();
+//     }
+
+//     static void uniquenessRatio_CB( int val, void* object_)
+//     {
+//         StereoBMSetteings* object = reinterpret_cast<StereoBMSetteings*> (object_);
+
+//         object->uniquenessRatio = val;
+//         object->stereoSGBMobject->setUniquenessRatio(object->uniquenessRatio);
+
+//         object->update_data();
+//     }
+
+//     static void speckleWindowSize_CB( int val, void* object_)
+//     {
+//         StereoBMSetteings* object = reinterpret_cast<StereoBMSetteings*> (object_);
+
+//         object->speckleWindowSize = val;
+//         object->stereoSGBMobject->setSpeckleWindowSize(object->speckleWindowSize);
+
+//         object->update_data();
+//     }
+
+//     static void speckleRange_CB( int val, void* object_)
+//     {
+//         StereoBMSetteings* object = reinterpret_cast<StereoBMSetteings*> (object_);
+
+//         object->speckleRange = val;
+//         object->stereoSGBMobject->setSpeckleRange(object->speckleRange);
+
+//         object->update_data();
+//     }
+
+//     static void fullDP_CB( int val, void* object_)
+//     {
+//         StereoBMSetteings* object = reinterpret_cast<StereoBMSetteings*> (object_);
+
+//         object->StereoMode = val;
+//         object->stereoSGBMobject->setMode(object->StereoMode);
+
+//         object->update_data();
+//     }
+
+
+//     void setPreFilterType_CB(int preFilterType);
+//     void setPreFilterSize_CB(int preFilterSize);
+//     void setPreFilterCap_CB(int preFilterCap);
+//     void setTextureThreshold_CB(int textureThreshold);
+//     void setUniquenessRatio_CB(int uniquenessRatio);
+//     void setSmallerBlockSize_CB(int blockSize);
+//     void setROI1_CB(Rect roi1);
+//     void setROI2_CB(Rect roi2);
+
+//     void update_data()
+//     {
+//         if(imgU_L.data == nullptr)
+//             return;
+//         TimeMeasure time;
+//         stereoSGBMobject->compute(imgU_L, imgU_R, disp);
+//         disp.convertTo(disp, CV_32F, 1.0f / 16.0f);
+//         cv::reprojectImageTo3D(disp, Out3D, Q, true);
+//         user_callback();
+//     }
+
+//     void fillBuffer(std::vector <Eigen::Vector3f>& vertex_point_buffer, std::vector <uint8_t>& color_point_buffer)
+//     {
+//         TimeMeasure time;
+
+//         double disparcityMapMin;
+//         minMaxLoc(disp, &disparcityMapMin);
+//         std::cout << "min map: " << disparcityMapMin << std::endl;
+
+//         cv::Mat mask = disp > disparcityMapMin;
+//         uint32_t NumberOfPoints = cv::sum(mask)[0];
+
+//         vertex_point_buffer.clear();
+//         vertex_point_buffer.reserve(static_cast<size_t>(NumberOfPoints));
+
+//         color_point_buffer.clear();
+//         color_point_buffer.reserve(static_cast<size_t>(NumberOfPoints));
+
+//         for (int y = 0; y < disp.rows; y++)
+//             for (int x = 0; x < disp.cols; x++)
+//                 if(mask.at<uint8_t>(y, x))
+//                 {
+//                     Eigen::Vector3f& vec = Out3D.at <Eigen::Vector3f> (y, x);
+//                     uint8_t& col = imgU_L.at <uint8_t> (y, x);
+//                     vertex_point_buffer.push_back(vec);
+//                     color_point_buffer.push_back(col);
+//                 }
+//     }
+
+//     void init(cv::Mat& Q)
+//     {
+//         using namespace cv;
+
+//         this->Q = Q;
+
+//         namedWindow("trackbar",cv::WINDOW_NORMAL);
+
+//         // Creating trackbars to dynamically update the StereoBM parameters
+//         createTrackbar("minDisparity",      "trackbar", nullptr , 15  , minDisparity_CB     , this);
+//         createTrackbar("numDisparities",    "trackbar", nullptr , 250 , numDisparities_CB   , this);
+//         createTrackbar("window_size",       "trackbar", nullptr , 20  , windows_size_CB     , this);
+//         createTrackbar("block_size",        "trackbar", nullptr , 100 , block_size_CB       , this);
+//         createTrackbar("disp12MaxDiff",     "trackbar", nullptr , 1000, disp12MaxDiff_CB    , this);
+//         createTrackbar("preFilterCap",      "trackbar", nullptr , 1000, preFilterCap_CB     , this);
+//         createTrackbar("uniquenessRatio",   "trackbar", nullptr , 1000, uniquenessRatio_CB  , this);
+//         createTrackbar("speckleWindowSize", "trackbar", nullptr , 1000, speckleWindowSize_CB, this);
+//         createTrackbar("speckleRange",      "trackbar", nullptr , 1000, speckleRange_CB     , this);
+//         createTrackbar("fullDP",            "trackbar", nullptr ,    4, fullDP_CB           , this);
+
+//         setTrackbarPos("minDisparity",      "trackbar", minDisparity      );
+//         setTrackbarPos("numDisparities",    "trackbar", numDisparities    );
+//         setTrackbarPos("window_size",       "trackbar", window_size       );
+//         setTrackbarPos("block_size",        "trackbar", block_size        );
+//         setTrackbarPos("disp12MaxDiff",     "trackbar", disp12MaxDiff     );
+//         setTrackbarPos("preFilterCap",      "trackbar", preFilterCap      );
+//         setTrackbarPos("uniquenessRatio",   "trackbar", uniquenessRatio   );
+//         setTrackbarPos("speckleWindowSize", "trackbar", speckleWindowSize );
+//         setTrackbarPos("speckleRange",      "trackbar", speckleRange      );
+//         setTrackbarPos("fullDP",            "trackbar", StereoMode        );
+//     }
+// };
+
 class StereoSGBMSetteings
 {
     public:
