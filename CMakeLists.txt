@@ -26,3 +26,6 @@ target_link_libraries( reconstruct ${OpenCV_LIBS} ${OPENGL_LIBRARIES} ${GLEW_LIB
 
 add_executable(captureImage captureImage.cpp)
 target_link_libraries( captureImage ${OpenCV_LIBS} -lpthread -lstdc++fs)
+
+add_executable(stereoReconructVideo stereoReconructVideo.cpp)
+target_link_libraries( stereoReconructVideo ${OpenCV_LIBS} ${OpenCV_LIBS} ${OPENGL_LIBRARIES} ${GLEW_LIBRARIES} -lGL -lGLU ${GLUT_LIBRARY} -lsfml-graphics -lsfml-window -lsfml-system -lpthread -lstdc++fs)

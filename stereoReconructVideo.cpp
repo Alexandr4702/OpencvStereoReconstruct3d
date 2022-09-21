@@ -58,7 +58,6 @@ std::vector <uint8_t> color_point_buffer[2] = {
 
 uint8_t opengl_current_bufer = 0;
 bool opengl_request_change_buffer = false;
-bool nextImage = false;
 
 void drawImage3D(sf::Shader& shader)
 {
@@ -189,10 +188,6 @@ void opengl_init(int argc, char** argv)
                     mainThreadExit = true;
                     openglExit = true;
                 }
-                if(event.key.code == sf::Keyboard::Key::N)
-                {
-                    nextImage = true;
-                }
             } break;
             case sf::Event::KeyReleased:
             {
@@ -280,18 +275,16 @@ void opengl_init(int argc, char** argv)
 
 int main(int argc, char** argv)
 {
-    string path = "../2022-09-20-22-46-57-calibration";
-    vector <string> files;
+    auto video = VideoCapture(2);
 
-    for (const auto & file : directory_iterator(path))
-    {
-        if (file.is_directory())
-            continue;
-        if (file.path().string().find(".jpg") == string::npos && file.path().string().find(".tif") == string::npos)
-            continue;
+    // video.set(CAP_PROP_FRAME_WIDTH , 2560);
+    // video.set(CAP_PROP_FRAME_HEIGHT, 960);
 
-        files.push_back(file.path().string());
-    }
+    // video.set(CAP_PROP_FRAME_WIDTH , 2560);
+    // video.set(CAP_PROP_FRAME_HEIGHT, 720);
+
+    video.set(CAP_PROP_FRAME_WIDTH , 1280);
+    video.set(CAP_PROP_FRAME_HEIGHT, 480);
 
     FileStorage StereoCalib("../camera_data_2022-09-20-23-05-04_stereo.yml", FileStorage::READ);
 
@@ -315,7 +308,8 @@ int main(int argc, char** argv)
     StereoCalib["Q" ]  >>  Q;
 
     Mat mapX_L, mapY_L, mapX_R, mapY_R;
-    Mat img_gray = imread(files[0], IMREAD_GRAYSCALE);
+    Mat img_gray;
+    video.read(img_gray);
 
     int startX_L =                    0 , startY_L = 0, width_L = img_gray.size[1] / 2, height_L = img_gray.size[0];
     int startX_R =  img_gray.size[1] / 2, startY_R = 0, width_R = img_gray.size[1] / 2, height_R = img_gray.size[0];
@@ -338,9 +332,10 @@ int main(int argc, char** argv)
     thread opengl(opengl_init, argc, argv);
 
     bool wait = true;
-    for(auto file : files)
+    for(;;)
     {
-        Mat img_gray = imread(file, IMREAD_GRAYSCALE);
+         video.read(img_gray);
+         cvtColor(img_gray, img_gray, COLOR_BGR2GRAY);
 
         Mat ROI_L(img_gray, Rect(startX_L, startY_L, width_L, height_L));
         Mat ROI_R(img_gray, Rect(startX_R, startY_R, width_R, height_R));
@@ -350,26 +345,12 @@ int main(int argc, char** argv)
 
         stereoSGBMobject.update_data();
 
-        // string filename_stem = std::filesystem::path(file).stem() ;
-        // write_ply(path + "/ply/" + filename_stem + ".ply", disp, Out3D, imgU_L);
-
         if(wait)
         {
-            imshow(file + "_L", stereoSGBMobject.imgU_L);
-            imshow(file + "_R", stereoSGBMobject.imgU_R);
+            imshow("L", stereoSGBMobject.imgU_L);
+            imshow("R", stereoSGBMobject.imgU_R);
 
             char k = waitKey(10);
-            while(k == -1 || !(k == 'p' || k == 27 || k == 'n'))
-            {
-                k = waitKey(40);
-                if(mainThreadExit)
-                    break;
-                if(nextImage)
-                {
-                    nextImage = false;
-                    break;
-                }
-            }
 
             if(k == 27)
             {
@@ -383,8 +364,8 @@ int main(int argc, char** argv)
                 openglExit = true;
                 continue;
             }
-            destroyWindow(file + "_L");
-            destroyWindow(file + "_R");
+            // destroyWindow("L");
+            // destroyWindow("R");
         }
         if(mainThreadExit)
             break;

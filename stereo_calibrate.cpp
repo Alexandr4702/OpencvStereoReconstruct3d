@@ -121,7 +121,7 @@ static void saveCameraParams( const string& filename,
 
 int main()
 {
-    string path = "./2022-08-27-13-18-52-calibration";
+    string path = "../2022-09-20-22-46-57-calibration";
     vector <string> files;
 
     for (const auto & file : directory_iterator(path))
@@ -155,8 +155,8 @@ int main()
         if (img.data == NULL)
             continue;
 
-        int startX_L =    0, startY_L = 0, width_L = 1280, height_L = 800;
-        int startX_R = 1280, startY_R = 0, width_R = 1280, height_R = 800;
+        int startX_L =    0           , startY_L = 0            , width_L = img.size[1] / 2, height_L = img.size[0];
+        int startX_R =  img.size[1] / 2, startY_R = 0, width_R = img.size[1] / 2, height_R = img.size[0];
 
         Mat ROI_L(img, Rect(startX_L, startY_L, width_L, height_L));
         Mat ROI_R(img, Rect(startX_R, startY_R, width_R, height_R));
