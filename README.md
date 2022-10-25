@@ -1,7 +1,7 @@
 # Stereo reconstruction openCV with visualisation in opengl.
 
 In this repo you will find a few apps:
-1. Application that can get image from arducam camera stereo camera on rpi. **captureImageRpi**
+1. Application that can get image from arducam stereo camera on rpi. **captureImageRpi**
 2. Application that can get image from usb stereo camera on your pc. **captureImage**
 3. Application that can get calibration data from captured images in yml format. **calibrate3D**
 4. Application that can perform stereo reconstruction from stereo images and calibration data in yaml format writes ply files that you can open in meshlab or other applications. Also you can change app settings to improve stereoreconstruction. **reconstruct**
