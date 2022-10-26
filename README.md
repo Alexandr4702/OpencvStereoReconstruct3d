@@ -16,7 +16,7 @@ For the apps on pc i used this camera:
 
 Examples:
 * https://www.youtube.com/watch?v=6PwHKxQcqoM
-* https://www.youtube.com/watch?v=6PwHKxQcqoM&ab_channel=AlexanderOrlov
+* https://www.youtube.com/watch?v=OlyhfjQFRKk
 
 Screenshots:
 * <img src="example.jpg"  alt="Examples of stereo reconstruct" width = "640" height="480" />
